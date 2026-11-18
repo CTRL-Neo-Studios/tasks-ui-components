@@ -1,0 +1,7 @@
+export {default as TaskList} from './components/TaskList.vue'
+export {default as TaskEditor} from './components/TaskEditor.vue'
+export {applyPatch, diff, type Patch, type TaskPatch, toggleDone, withDue, withRepeat, withStart, withValue} from './changes'
+export {dayOf, formatTime, fromDateValue, toDateValue} from './dates'
+export {fieldTitle, optionTitle} from './fieldText'
+export {defaultLabels, type TaskLabels} from './labels'
+export {type Row, type RowOptions, taskRows} from './rows'

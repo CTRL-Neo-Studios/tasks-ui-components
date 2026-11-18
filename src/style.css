@@ -1,0 +1,15 @@
+/*
+ * The components' stylesheet (`@type32/tasks-ui-components/style.css`). Their classes carry the `tk` prefix
+ * (`tk:flex`), so the sheet sets nothing on the consumer's own elements and two sheets defining `.p-4` never meet. No
+ * preflight, nothing on `:root`: the consumer's Nuxt UI has both.
+ */
+/* Tailwind's order, as the consumer's sheet declares it: loaded first, this sheet must not put `utilities` before `base`. */
+@layer theme, base, components, utilities;
+@import "./theme.css" reference theme(inline) prefix(tk);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Explicit, so a `.gitignore` that hides the sources (or none at all) changes nothing. */
+@source "./";
+
+/* Nuxt UI's colour mode. */
+@custom-variant dark (&:where(.dark, .dark *));

@@ -1,0 +1,58 @@
+{
+  "name": "@type32/tasks-ui-components",
+  "version": "0.0.0",
+  "description": "Vue components for @type32/tasks documents, drawn with Nuxt UI: list, board, calendar, timeline. For Vue and Nuxt.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./nuxt": {
+      "types": "./dist/nuxt.d.ts",
+      "import": "./dist/nuxt.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "scripts": {
+    "build": "vite build && tailwindcss -i src/style.css -o dist/style.css && vue-tsc -p tsconfig.build.json",
+    "typecheck": "vue-tsc -p .",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@nuxt/kit": "^4.0.0",
+    "@nuxt/ui": "^4.12.0",
+    "@type32/tasks": "^0.2.0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@nuxt/kit": "^4.6.4",
+    "@nuxt/ui": "^4.12.0",
+    "@tailwindcss/cli": "^4.3.5",
+    "@type32/tasks": "^0.2.0",
+    "@vitejs/plugin-vue": "^6.0.11",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0",
+    "vue": "^3.5.45",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "@tanstack/vue-virtual": "^3.13.52"
+  }
+}
