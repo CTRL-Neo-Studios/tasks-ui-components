@@ -62,9 +62,11 @@ onMounted(() => scroller.value?.scrollTo({top: 7 * HOUR_PX}))
 </script>
 
 <template>
-  <div class="tk:flex tk:h-full tk:min-h-0 tk:flex-col tk:select-none">
-    <!-- Each row keeps the scrollbar's room, so its columns stand over the hours' columns. -->
-    <div class="tk:grid tk:overflow-hidden tk:border-b tk:border-default tk:[scrollbar-gutter:stable]" :style="template">
+  <!-- One scroller with the dates and the all-day row stuck at its top: they're as wide as the hours under them,
+       scrollbar or not. -->
+  <div ref="scroller" class="tk:h-full tk:min-h-0 tk:overflow-y-auto tk:select-none">
+    <div class="tk:sticky tk:top-0 tk:z-20 tk:bg-default">
+    <div class="tk:grid tk:border-b tk:border-default" :style="template">
       <span />
       <div v-for="day in days" :key="day.toString()" class="tk:flex tk:items-baseline tk:gap-1.5 tk:px-2 tk:py-1.5 tk:text-sm">
         <span class="tk:text-xs tk:text-muted">{{ weekday.format(day.toDate('UTC')) }}</span>
@@ -74,7 +76,7 @@ onMounted(() => scroller.value?.scrollTo({top: 7 * HOUR_PX}))
         >{{ day.day }}</span>
       </div>
     </div>
-    <div class="tk:grid tk:overflow-hidden tk:border-b tk:border-default tk:[scrollbar-gutter:stable]" :style="template">
+    <div class="tk:grid tk:border-b tk:border-default" :style="template">
       <span />
       <div class="tk:relative" :style="{gridColumn: `span ${days.length}`, height: `${laneCount * LANE + 6}px`}">
         <div
@@ -109,7 +111,7 @@ onMounted(() => scroller.value?.scrollTo({top: 7 * HOUR_PX}))
         </div>
       </div>
     </div>
-    <div ref="scroller" class="tk:min-h-0 tk:flex-1 tk:overflow-y-auto tk:[scrollbar-gutter:stable]">
+    </div>
       <div class="tk:grid" :style="template">
         <div class="tk:relative" :style="{height: `${24 * HOUR_PX}px`}">
           <span
@@ -161,6 +163,5 @@ onMounted(() => scroller.value?.scrollTo({top: 7 * HOUR_PX}))
           </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
