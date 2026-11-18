@@ -1,9 +1,9 @@
 # @type32/tasks-ui-components
 
 Vue components for [`@type32/tasks`](https://www.npmjs.com/package/@type32/tasks) documents, drawn with
-[Nuxt UI](https://ui.nuxt.com): a list of reminders, a board and a task editor so far; a calendar and a timeline to
-come. For Vue and Nuxt apps that use Nuxt UI 4. The components draw a document and report what the user did; writing
-the document is yours.
+[Nuxt UI](https://ui.nuxt.com): a list of reminders, a board, a calendar and a task editor so far; a timeline to come.
+For Vue and Nuxt apps that use Nuxt UI 4. The components draw a document and report what the user did; writing the
+document is yours.
 
 ```sh
 npm install @type32/tasks-ui-components
@@ -93,6 +93,21 @@ Columns that are options or lists are added, renamed, coloured and deleted on th
 option, patch)` and `createOption(field, option)` (apply them with `withOption`; renaming a built-in status adds an
 option of its id with a title, and a new status takes one of the field's categories, so other apps know what it
 means), `changeList` and `createList`.
+
+## The calendar
+
+`TaskCalendar` takes the same props: a month, a week or a day (the view's `scale`), a small month and the lists
+beside it. Every occurrence of a repeating task is drawn (the format's `occurrences`), at the viewer's time
+(`timeZone`: a meeting in Berlin is at 4 in New York, or 5 the week the clocks change in one city and not the other).
+Spans are blocks in a day's hours, or bars across days when they're dates or run past midnight; a moment is drawn at
+its start, a todo at its due.
+
+A click opens a task's editor beside it; a drag moves it (by days, and by minutes in a day's hours) or stretches its
+end (`shiftTask`: a date stays a date, a duration stays a duration); a drag on empty hours, or a double click, draws a
+new task. A moved occurrence of a repeating task is reported as `moveOccurrence(item, shift)`, for you to ask: that
+one (`detachOccurrence`: the series skips it, a task of its own takes it) or the series (`shiftTask`). Switching
+scale or a list off reports `changeView` (`scale`, `listIds`). The day and week packing follow the
+[Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar) (MIT, © 2025 Nuxt UI Templates).
 
 ## Styling
 

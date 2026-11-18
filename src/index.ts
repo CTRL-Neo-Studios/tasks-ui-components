@@ -1,5 +1,7 @@
 export {default as TaskList} from './components/TaskList.vue'
 export {default as TaskBoard} from './components/TaskBoard.vue'
+export {default as TaskCalendar} from './components/TaskCalendar.vue'
+export {type CalendarItem, calendarItems, detachOccurrence, draftTask, inViewer, layoutDay, layoutLanes, monthWeeks, type Shift, shiftTask, weekStart} from './calendar'
 export {default as TaskEditor} from './components/TaskEditor.vue'
 export {boardGroupBy, moveTask, moveToGroup, optionId, withOption} from './board'
 export {applyPatch, diff, type Patch, type TaskPatch, toggleDone, withDue, withRepeat, withStart, withValue} from './changes'

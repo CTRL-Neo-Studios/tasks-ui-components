@@ -57,3 +57,14 @@ export function formatTime(value: string, locale: string | undefined, today: Cal
     }
     return format.format(time.toDate('UTC'))
 }
+
+/** A time of day (minutes after midnight) in `locale`: `9:30 AM`, `09:30`. */
+export function formatClock(minutes: number, locale: string | undefined): string {
+    const key = `${locale}|clock`
+    let format = formatters.get(key)
+    if (!format) {
+        format = new DateFormatter(locale ?? new Intl.DateTimeFormat().resolvedOptions().locale, {hour: 'numeric', minute: '2-digit', timeZone: 'UTC'})
+        formatters.set(key, format)
+    }
+    return format.format(new Date(Date.UTC(2000, 0, 1, Math.floor(minutes / 60), minutes % 60)))
+}
