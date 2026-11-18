@@ -1,7 +1,7 @@
 # @type32/tasks-ui-components
 
 Vue components for [`@type32/tasks`](https://www.npmjs.com/package/@type32/tasks) documents, drawn with
-[Nuxt UI](https://ui.nuxt.com): a list of reminders, a board, a calendar and a task editor so far; a timeline to come.
+[Nuxt UI](https://ui.nuxt.com): a list of reminders, a board, a calendar, a timeline and a task editor.
 For Vue and Nuxt apps that use Nuxt UI 4. The components draw a document and report what the user did; writing the
 document is yours.
 
@@ -109,6 +109,23 @@ one (`detachOccurrence`: the series skips it, a task of its own takes it) or the
 scale or a list off reports `changeView` (`scale`, `listIds`). The day and week packing follow the
 [Nuxt UI calendar template](https://github.com/nuxt-ui-templates/calendar) (MIT, © 2025 Nuxt UI Templates).
 
+## The timeline
+
+`TaskTimeline` takes the same props: a Gantt of the view's tasks. On the left, the outline: subtasks under their
+parent (folding), each task's length and progress (`values.progress`; 100 once done). On the right, a day axis at the
+view's `scale` (`day`, `week` or `month`): spans as bars filled to their progress, moments as diamonds, a todo's due as
+a flag and a span's due as a mark, a parent without times of its own as the stretch its subtasks cover (its progress
+theirs, by length), lines from each task to those in its `dependsOn`, today's line. It's one scroller: the outline
+stays at the left and the dates at the top, and only the rows on screen are drawn, so thousands of tasks scroll as a
+few do.
+
+A click opens a task's editor; a drag moves a bar by days, or stretches its end (`shiftTask`; a repeating task's
+series moves whole); a drag from the dot after a bar onto another row reports `change` with that row's `dependsOn`
+grown. Check what comes back before you keep it (the format's `validate`): a dependency that closes a loop is an
+error there. A right click opens a task's menu: Edit, Duplicate, its list (and so its colour), the dependencies to
+remove, Delete. Switching scale reports `changeView` (`scale`). The outline and the bars are `timelineRows`, exported
+with `timelineAxis`, `timelineTicks` and `linkPath` for code of your own.
+
 ## Styling
 
 The components' classes carry the prefix `tk:` (`tk:flex`), compiled into `style.css` against Nuxt UI's design tokens
@@ -121,7 +138,7 @@ those variables. The sheet has no preflight and sets nothing on `:root`, and its
 | ------------------- | -------------------------------------------------------------------------------------- |
 | `bun run build`     | Code with Vite (`dist/*.js`), the stylesheet with Tailwind's CLI, types with `vue-tsc` |
 | `bun run typecheck` | `vue-tsc`                                                                              |
-| `bun run test`      | Vitest: the list's rows, the changes                                                   |
+| `bun run test`      | Vitest: the list's rows, the board's moves, the calendar's and the timeline's models   |
 
 Templates import Nuxt UI's components by file (`import UButton from "@nuxt/ui/components/Button.vue"`), never by
 auto-import or global registration, so the compiled code works in any consumer.

@@ -30,6 +30,27 @@ export function dayAt(x: number, y: number): CalendarDate | undefined {
 const snap = (minutes: number, round = Math.round) => round(minutes / SNAP_MINUTES) * SNAP_MINUTES
 
 /**
+ * A press followed to its release: `move` once it's travelled a few pixels (a drag, not a click), `end` with whether it
+ * did.
+ */
+export function followPointer(event: PointerEvent, move: (e: PointerEvent) => void, end: (e: PointerEvent, moved: boolean) => void) {
+    const [x0, y0] = [event.clientX, event.clientY]
+    let moved = false
+    const onMove = (e: PointerEvent) => {
+        if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < THRESHOLD) return
+        moved = true
+        move(e)
+    }
+    const onUp = (e: PointerEvent) => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        end(e, moved)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+}
+
+/**
  * A calendar's pointer gestures. On an item: a click opens it, a drag moves it (or stretches its end) by days and, in a
  * day's hours, by minutes. On a day's empty hours: a drag draws a new task.
  */
@@ -40,22 +61,11 @@ export function useCalendarDrag(on: {
 }) {
     const preview = shallowRef<Preview>()
 
-    function follow(event: PointerEvent, move: (e: PointerEvent, moved: boolean) => boolean, end: (e: PointerEvent, moved: boolean) => void) {
-        const [x0, y0] = [event.clientX, event.clientY]
-        let moved = false
-        const onMove = (e: PointerEvent) => {
-            if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < THRESHOLD) return
-            moved = move(e, moved) || moved
-        }
-        const onUp = (e: PointerEvent) => {
-            window.removeEventListener('pointermove', onMove)
-            window.removeEventListener('pointerup', onUp)
+    const follow = (event: PointerEvent, move: (e: PointerEvent) => void, end: (e: PointerEvent, moved: boolean) => void) =>
+        followPointer(event, move, (e, moved) => {
             end(e, moved)
             preview.value = undefined
-        }
-        window.addEventListener('pointermove', onMove)
-        window.addEventListener('pointerup', onUp)
-    }
+        })
 
     /** On an item: `time` in a day's hours (minutes count), `days` in a row of days. */
     function itemDown(event: PointerEvent, item: CalendarItem, edge: 'start' | 'end', grid: 'time' | 'days') {
@@ -69,10 +79,7 @@ export function useCalendarDrag(on: {
             minutes: grid === 'time' && item.timed ? snap((e.clientY - event.clientY) / HOUR_PX * 60) : 0,
             edge,
         })
-        follow(event, (e) => {
-            preview.value = {item, ...shift(e), columnWidth}
-            return true
-        }, (e, moved) => {
+        follow(event, (e) => (preview.value = {item, ...shift(e), columnWidth}), (e, moved) => {
             if (!moved) return on.open(item, el)
             const s = shift(e)
             if (s.days || s.minutes) on.commit(item, s)
@@ -89,10 +96,7 @@ export function useCalendarDrag(on: {
             const there = at(y)
             return there >= start ? {start, end: Math.max(there, start + SNAP_MINUTES)} : {start: there, end: start + SNAP_MINUTES}
         }
-        follow(event, (e) => {
-            preview.value = {days: 0, minutes: 0, edge: 'start', columnWidth: 0, draft: {day, ...range(e.clientY)}}
-            return true
-        }, (e, moved) => {
+        follow(event, (e) => (preview.value = {days: 0, minutes: 0, edge: 'start', columnWidth: 0, draft: {day, ...range(e.clientY)}}), (e, moved) => {
             if (!moved) return
             const {start: from, end} = range(e.clientY)
             on.draw(day, from, end)
