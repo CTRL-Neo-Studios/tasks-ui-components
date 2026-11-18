@@ -16,3 +16,6 @@ export function optionTitle(doc: TaskDocument, field: ResolvedField, option: Res
 
 /** The flame's colour for a priority category (`priorityOf`). */
 export const PRIORITY_CLASS: Record<string, string> = {high: 'tk:text-error', medium: 'tk:text-warning', low: 'tk:text-info'}
+
+/** The colours offered for lists and options, in the order new ones take them. */
+export const PALETTE = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#64748b']

@@ -12,6 +12,7 @@ import {useVirtualizer} from '@tanstack/vue-virtual'
 import {isOpen, type List, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, ref, useTemplateRef} from 'vue'
 import type {Patch, TaskPatch} from '../changes'
+import {PALETTE} from '../fieldText'
 import {type TaskLabels, useLabels} from '../labels'
 import {listAndNested, taskRows} from '../rows'
 import TaskRow from './TaskRow.vue'
@@ -102,7 +103,6 @@ const listTree = computed(() => {
     return out
 })
 const focus = (el: unknown) => (el as HTMLInputElement | null)?.focus()
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#ec4899', '#14b8a6', '#64748b']
 const naming = ref<string | 'new'>()
 const nameDraft = ref('')
 function startNaming(id: string | 'new', current = '') {
@@ -115,7 +115,7 @@ function commitName() {
     naming.value = undefined
     if (!title || id === undefined) return
     if (id !== 'new') return emit('changeList', id, {title})
-    const list: List = {id: crypto.randomUUID(), title, color: COLORS[lists.value.length % COLORS.length], updatedAt: now()}
+    const list: List = {id: crypto.randomUUID(), title, color: PALETTE[lists.value.length % PALETTE.length], updatedAt: now()}
     emit('createList', list)
     listId.value = list.id
 }
@@ -124,7 +124,7 @@ const listMenu = (list: List) => [
     [{
         label: labels.value.color,
         icon: 'i-lucide-palette',
-        children: COLORS.map(color => ({
+        children: PALETTE.map(color => ({
             label: color,
             type: 'checkbox' as const,
             checked: list.color === color,

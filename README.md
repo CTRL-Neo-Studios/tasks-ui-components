@@ -1,7 +1,7 @@
 # @type32/tasks-ui-components
 
 Vue components for [`@type32/tasks`](https://www.npmjs.com/package/@type32/tasks) documents, drawn with
-[Nuxt UI](https://ui.nuxt.com): a list of reminders and a task editor so far; a board, a calendar and a timeline to
+[Nuxt UI](https://ui.nuxt.com): a list of reminders, a board and a task editor so far; a calendar and a timeline to
 come. For Vue and Nuxt apps that use Nuxt UI 4. The components draw a document and report what the user did; writing
 the document is yours.
 
@@ -80,6 +80,19 @@ occurrence), `withStart` (a span keeps its length), `withDue`, `withRepeat`, `wi
 
 Hold a date from `@internationalized/date` in a `shallowRef`: `ref` types it as a plain object without its private
 fields.
+
+## The board
+
+`TaskBoard` takes the list's props and events. Its columns are the view's `groupBy` (the status when it has none):
+every option of a select or multiSelect, every list, or a star's and a boolean's two; empty ones too. A card dragged
+to another column reports a `change` (`moveToGroup`: into a done status it's completed as the checkbox does; a
+multiSelect swaps the one value for the other); while the view doesn't sort, `move(id, before)` reports where it went
+in the document's order (`moveTask`). A card opens its editor in a popover; each column has New task at its foot.
+
+Columns that are options or lists are added, renamed, coloured and deleted on the board: `changeOption(field,
+option, patch)` and `createOption(field, option)` (apply them with `withOption`; renaming a built-in status adds an
+option of its id with a title, and a new status takes one of the field's categories, so other apps know what it
+means), `changeList` and `createList`.
 
 ## Styling
 

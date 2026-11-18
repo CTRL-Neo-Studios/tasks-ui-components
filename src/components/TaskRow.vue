@@ -1,19 +1,14 @@
 <script setup lang="ts">
-/**
- * One task in the list: its checkbox, title and what describes it (repeat, list, star, priority, tags, Do, Due). Open,
- * it's the task's editor in a card.
- */
+/** One task in the list: its checkbox, title and what describes it. Open, it's the task's editor in a card. */
 import type {CalendarDate} from '@internationalized/date'
-import UIcon from '@nuxt/ui/components/Icon.vue'
-import {type Fields, isComplete, isOpen, isOverdue, type List, priorityOf, type Task, type TaskDocument} from '@type32/tasks'
-import {computed} from 'vue'
-import {type TaskPatch, toggleDone} from '../changes'
-import {formatTime} from '../dates'
-import {PRIORITY_CLASS} from '../fieldText'
+import {type Fields, isOpen, type List, type Task, type TaskDocument} from '@type32/tasks'
+import type {TaskPatch} from '../changes'
 import {useLabels} from '../labels'
+import TaskCheck from './TaskCheck.vue'
 import TaskEditor from './TaskEditor.vue'
+import TaskMeta from './TaskMeta.vue'
 
-const props = defineProps<{
+defineProps<{
     task: Task
     depth: number
     open: boolean
@@ -28,15 +23,6 @@ const props = defineProps<{
 const emit = defineEmits<{ change: [patch: TaskPatch], create: [task: Task], open: [], close: [] }>()
 defineSlots<{ notes?(props: { task: Task, text: string, update: (text: string) => void }): unknown }>()
 const labels = useLabels(() => undefined)
-
-const closed = computed(() => !isOpen(props.task, props.fields))
-const done = computed(() => isComplete(props.task, props.fields))
-const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props.timeZone}))
-const flame = computed(() => PRIORITY_CLASS[priorityOf(props.task, props.fields) ?? ''])
-const tags = computed(() => {
-    const v = props.task.values?.tags
-    return Array.isArray(v) ? v.slice(0, 3) : []
-})
 </script>
 
 <template>
@@ -48,16 +34,7 @@ const tags = computed(() => {
     :style="{marginInlineStart: `${depth * 1.5}rem`}"
     @click="!open && emit('open')"
   >
-    <button
-      type="button"
-      class="tk:mt-0.5 tk:flex tk:size-5 tk:shrink-0 tk:items-center tk:justify-center tk:rounded-full tk:border tk:transition-colors"
-      :class="closed ? 'tk:border-primary tk:bg-primary tk:text-inverted' : 'tk:border-accented tk:hover:border-primary'"
-      :aria-label="closed ? labels.reopen : labels.complete"
-      :aria-pressed="closed"
-      @click.stop="emit('change', toggleDone(task, fields, new Date().toISOString()))"
-    >
-      <UIcon v-if="closed" :name="done ? 'i-lucide-check' : 'i-lucide-x'" class="tk:size-3.5" />
-    </button>
+    <TaskCheck :task="task" :fields="fields" @change="emit('change', $event)" />
     <TaskEditor
       v-if="open"
       :task="task"
@@ -76,25 +53,10 @@ const tags = computed(() => {
       </template>
     </TaskEditor>
     <template v-else>
-      <span class="tk:min-w-0 tk:flex-1 tk:truncate" :class="closed ? 'tk:text-muted tk:line-through' : 'tk:text-default'">
+      <span class="tk:min-w-0 tk:flex-1 tk:truncate" :class="isOpen(task, fields) ? 'tk:text-default' : 'tk:text-muted tk:line-through'">
         {{ task.title || labels.newTask }}
       </span>
-      <span class="tk:flex tk:shrink-0 tk:items-center tk:gap-2 tk:text-sm tk:text-muted">
-        <UIcon v-if="task.recurrence" name="i-lucide-repeat" class="tk:size-3.5" />
-        <span v-if="list" class="tk:flex tk:items-center tk:gap-1.5">
-          <span class="tk:size-2 tk:rounded-full tk:bg-accented" :style="list.color && {backgroundColor: list.color}" />
-          {{ list.title }}
-        </span>
-        <span v-for="tag in tags" :key="tag">#{{ tag }}</span>
-        <UIcon v-if="task.starred" name="i-lucide-star" class="tk:size-4 tk:text-warning" />
-        <UIcon v-if="flame" name="i-lucide-flame" class="tk:size-4" :class="flame" />
-        <span v-if="task.start" class="tk:rounded-md tk:border tk:border-default tk:px-1.5 tk:text-xs">
-          {{ labels.do }} {{ formatTime(task.start, locale, today) }}
-        </span>
-        <span v-if="task.due" class="tk:rounded-md tk:border tk:px-1.5 tk:text-xs" :class="late ? 'tk:border-error/50 tk:text-error' : 'tk:border-default tk:text-default'">
-          {{ formatTime(task.due, locale, today) }}
-        </span>
-      </span>
+      <TaskMeta class="tk:shrink-0 tk:flex-nowrap" :task="task" :fields="fields" :list="list" :today="today" :time-zone="timeZone" :locale="locale" />
     </template>
   </div>
 </template>
