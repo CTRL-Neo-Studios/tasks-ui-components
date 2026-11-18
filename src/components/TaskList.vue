@@ -81,6 +81,17 @@ function createTyped() {
     emit('create', {id: crypto.randomUUID(), title, ...(listId.value !== undefined && {listId: listId.value}), updatedAt: now()})
 }
 
+/** Opens a task's editor and scrolls to it, for a caller that leads to one task; nothing when the view doesn't show it. */
+async function open(id: string) {
+    listId.value = undefined
+    await nextTick()
+    const index = rows.value.findIndex(r => r.kind === 'task' && r.task.id === id)
+    if (index === -1) return
+    openId.value = id
+    virtualizer.value.scrollToIndex(index, {align: 'center'})
+}
+defineExpose({open})
+
 // The lists column: each list with how many of its tasks (and its sublists') are still open.
 const openCounts = computed(() => {
     const counts = new Map<string, number>()

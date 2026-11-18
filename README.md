@@ -73,7 +73,9 @@ coloured and deleted. Only the rows on screen are drawn, so thousands of tasks s
 | `changeList(id, patch)`, `createList(list)` | The same for lists. |
 
 The `notes` slot (`{task, text, update}`) draws a task's notes in its editor: a textarea by default, your own
-Markdown editor if you have one. `TaskEditor` is the editor alone, with the same events for one task.
+Markdown editor if you have one. `TaskEditor` is the editor alone, with the same events for one task. To lead the user
+to one task (a link, a search result), call the list's `open(id)` through a template ref: its editor opens and its row
+scrolls into view.
 
 The changes the components make are exported, for code of your own: `toggleDone` (a repeating task moves to its next
 occurrence), `withStart` (a span keeps its length), `withDue`, `withRepeat`, `withValue`.
