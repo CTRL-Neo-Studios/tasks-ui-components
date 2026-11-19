@@ -13,6 +13,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import UContextMenu, {type ContextMenuItem} from '@nuxt/ui/components/ContextMenu.vue'
 import UIcon from '@nuxt/ui/components/Icon.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
+import UToggleGroup from '@nuxt/ui/components/ToggleGroup.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
 import {isOpen, resolveFields, type Task, type TaskDocument, type View, viewTasks} from '@type32/tasks'
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch} from 'vue'
@@ -248,14 +249,11 @@ function setScale(next: Scale) {
     <div class="tk:flex tk:items-center tk:gap-2 tk:border-b tk:border-default tk:px-3 tk:py-1.5">
       <UButton size="sm" variant="outline" color="neutral" :label="labels.today" @click="toToday" />
       <span class="tk:grow" />
-      <UButton
-        v-for="s in (['day', 'week', 'month'] as const)"
-        :key="s"
+      <UToggleGroup
+        :items="(['day', 'week', 'month'] as const).map(s => ({value: s, label: labels[s]}))"
         size="sm"
-        :variant="scale === s ? 'soft' : 'ghost'"
-        :color="scale === s ? 'primary' : 'neutral'"
-        :label="labels[s]"
-        @click="setScale(s)"
+        :model-value="scale"
+        @update:model-value="(v: unknown) => (['day', 'week', 'month'] as const).includes(v as never) && setScale(v as Scale)"
       />
     </div>
     <UContextMenu :items="menu">

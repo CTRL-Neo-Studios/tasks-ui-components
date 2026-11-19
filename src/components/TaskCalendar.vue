@@ -9,6 +9,7 @@ import {type CalendarDate, DateFormatter, getLocalTimeZone, now as nowIn, today 
 import UButton from '@nuxt/ui/components/Button.vue'
 import UCalendar from '@nuxt/ui/components/Calendar.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
+import UToggleGroup from '@nuxt/ui/components/ToggleGroup.vue'
 import {resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, onBeforeUnmount, ref, shallowRef} from 'vue'
 import {type CalendarItem, calendarItems, draftTask, monthWeeks, type Shift, shiftTask, SNAP_MINUTES, weekStart} from '../calendar'
@@ -166,14 +167,11 @@ function gridCreate(event: MouseEvent, day: CalendarDate) {
         <UButton size="sm" variant="outline" color="neutral" :label="labels.today" @click="go(0)" />
         <span class="tk:ms-1 tk:truncate tk:font-semibold tk:text-highlighted" data-calendar-title>{{ title }}</span>
         <span class="tk:grow" />
-        <UButton
-          v-for="s in (['day', 'week', 'month'] as const)"
-          :key="s"
+        <UToggleGroup
+          :items="(['day', 'week', 'month'] as const).map(s => ({value: s, label: labels[s]}))"
           size="sm"
-          :variant="scale === s ? 'soft' : 'ghost'"
-          :color="scale === s ? 'primary' : 'neutral'"
-          :label="labels[s]"
-          @click="setScale(s)"
+          :model-value="scale"
+          @update:model-value="(v: unknown) => (['day', 'week', 'month'] as const).includes(v as never) && setScale(v as 'day' | 'week' | 'month')"
         />
       </div>
       <CalendarMonth

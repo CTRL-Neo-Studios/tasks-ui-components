@@ -75,7 +75,8 @@ coloured and deleted. Only the rows on screen are drawn, so thousands of tasks s
 The `notes` slot (`{task, text, update}`) draws a task's notes in its editor: a textarea by default, your own
 Markdown editor if you have one. `TaskEditor` is the editor alone, with the same events for one task. To lead the user
 to one task (a link, a search result), call the list's `open(id)` through a template ref: its editor opens and its row
-scrolls into view.
+scrolls into view. `TaskSummary` draws one task as a row, to look at only (nothing in it acts): `task`, and
+optionally its document's `fields`, its `list`, `timeZone`, `locale` and `labels`.
 
 The changes the components make are exported, for code of your own: `toggleDone` (a repeating task moves to its next
 occurrence), `withStart` (a span keeps its length), `withDue`, `withRepeat`, `withValue`.

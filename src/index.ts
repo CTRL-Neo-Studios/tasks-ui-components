@@ -5,6 +5,7 @@ export {type CalendarItem, calendarItems, detachOccurrence, draftTask, inViewer,
 export {default as TaskTimeline} from './components/TaskTimeline.vue'
 export {type Axis, DAY_WIDTH, linkPath, type Scale, type Tick, timelineAxis, type TimelineBar, type TimelineRow, timelineRows, timelineTicks} from './timeline'
 export {default as TaskEditor} from './components/TaskEditor.vue'
+export {default as TaskSummary} from './components/TaskSummary.vue'
 export {boardGroupBy, moveTask, moveToGroup, optionId, withOption} from './board'
 export {applyPatch, diff, type Patch, type TaskPatch, toggleDone, withDue, withRepeat, withStart, withValue} from './changes'
 export {dayOf, formatTime, fromDateValue, toDateValue} from './dates'
