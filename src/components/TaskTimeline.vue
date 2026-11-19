@@ -32,12 +32,16 @@ const props = withDefaults(defineProps<{
     /** 0 is Sunday. */
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
     labels?: Partial<TaskLabels>
-}>(), {timeZone: undefined, locale: undefined, weekStartsOn: 1, labels: undefined})
+    /** Off: a click reports `open` instead of opening the task's editor; no menu, no dependencies drawn. */
+    editor?: boolean
+}>(), {timeZone: undefined, locale: undefined, weekStartsOn: 1, labels: undefined, editor: true})
 const emit = defineEmits<{
     change: [id: string, patch: TaskPatch]
     create: [task: Task]
     /** The view's `scale` changed here. */
     changeView: [patch: Patch<View>]
+    /** A task clicked, with `editor` off. */
+    open: [id: string]
 }>()
 defineSlots<{ notes?(props: { task: Task, text: string, update: (text: string) => void }): unknown }>()
 const labels = useLabels(() => props.labels)
@@ -178,7 +182,7 @@ function linkDown(event: PointerEvent, row: TimelineRow, index: number) {
 // The editor, one at a time, beside what was clicked.
 const editing = shallowRef<{ id: string, el: HTMLElement }>()
 const editingTask = computed(() => editing.value && props.document.tasks.find(t => t.id === editing.value!.id && !t.deletedAt))
-const open = (id: string, el: HTMLElement) => (editing.value = {id, el})
+const open = (id: string, el: HTMLElement) => (props.editor ? (editing.value = {id, el}) : emit('open', id))
 async function openWhenDrawn(id: string) {
     await nextTick()
     requestAnimationFrame(() => {
@@ -196,7 +200,7 @@ function create(task: Task) {
 const menuTask = shallowRef<Task>()
 function pick(event: MouseEvent) {
     const id = (event.target as HTMLElement).closest<HTMLElement>('[data-row]')?.dataset.task
-    menuTask.value = id === undefined ? undefined : props.document.tasks.find(t => t.id === id)
+    menuTask.value = id === undefined || !props.editor ? undefined : props.document.tasks.find(t => t.id === id)
     if (!menuTask.value) event.stopPropagation()
 }
 const menu = computed((): ContextMenuItem[][] => {
@@ -259,7 +263,7 @@ function setScale(next: Scale) {
         <div ref="content" class="tk:relative tk:min-h-full" :style="{width: `${OUTLINE + width}px`, height: `${virtualizer.getTotalSize()}px`}">
           <div class="tk:sticky tk:top-0 tk:z-30 tk:flex tk:border-b tk:border-default tk:bg-default" :style="{height: `${HEADER}px`}">
             <div
-              class="tk:sticky tk:start-0 tk:z-10 tk:flex tk:shrink-0 tk:items-end tk:gap-1 tk:border-e tk:border-default tk:bg-default tk:px-3 tk:pb-1.5 tk:text-xs tk:font-medium tk:text-muted"
+              class="tk:sticky tk:start-0 tk:z-10 tk:flex tk:shrink-0 tk:items-end tk:gap-1 tk:whitespace-nowrap tk:border-e tk:border-default tk:bg-default tk:px-3 tk:pb-1.5 tk:text-xs tk:font-medium tk:text-muted"
               :style="{width: `${OUTLINE}px`}"
             >
               <span class="tk:flex-1">{{ labels.title }}</span>
@@ -385,6 +389,7 @@ function setScale(next: Scale) {
                   <template v-for="span in [extent(row)]" :key="0">
                     <template v-if="span">
                       <span
+                        v-if="editor"
                         class="tk:absolute tk:top-[13px] tk:size-2.5 tk:cursor-crosshair tk:rounded-full tk:border-2 tk:border-primary tk:bg-default tk:opacity-0 tk:group-hover:opacity-100"
                         :style="{left: `${span.to * dw + 4}px`}"
                         data-link-from

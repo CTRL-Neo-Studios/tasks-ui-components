@@ -28,12 +28,16 @@ const props = withDefaults(defineProps<{
     /** 0 is Sunday. */
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
     labels?: Partial<TaskLabels>
-}>(), {timeZone: undefined, locale: undefined, weekStartsOn: 1, labels: undefined})
+    /** Off: a click reports `open` instead of opening the task's editor, and a new task isn't opened either. */
+    editor?: boolean
+}>(), {timeZone: undefined, locale: undefined, weekStartsOn: 1, labels: undefined, editor: true})
 const emit = defineEmits<{
     change: [id: string, patch: TaskPatch]
     create: [task: Task]
     /** The view's `scale` or `listIds` changed here. */
     changeView: [patch: Patch<View>]
+    /** A task clicked, with `editor` off. */
+    open: [id: string]
     /**
      * One occurrence of a repeating task dragged: yours to ask whether it's that one (`detachOccurrence`) or the whole
      * series (`shiftTask`).
@@ -112,11 +116,11 @@ async function openWhenDrawn(id: string) {
 }
 function create(task: Task) {
     emit('create', task)
-    void openWhenDrawn(task.id)
+    if (props.editor) void openWhenDrawn(task.id)
 }
 
 const drag = useCalendarDrag({
-    open: (item, el) => (editing.value = {id: item.task.id, el}),
+    open: (item, el) => (props.editor ? (editing.value = {id: item.task.id, el}) : emit('open', item.task.id)),
     commit(item, shift) {
         if (item.task.recurrence) emit('moveOccurrence', item, shift)
         else emit('change', item.task.id, shiftTask(item.task, shift))

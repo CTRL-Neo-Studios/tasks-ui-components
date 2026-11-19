@@ -128,6 +128,10 @@ error there. A right click opens a task's menu: Edit, Duplicate, its list (and s
 remove, Delete. Switching scale reports `changeView` (`scale`). The outline and the bars are `timelineRows`, exported
 with `timelineAxis`, `timelineTicks` and `linkPath` for code of your own.
 
+Both the calendar and the timeline take `:editor="false"` for rows that aren't a document's tasks (a database's, a
+note's): a click reports `open(id)` instead of opening the editor, and the timeline has no menu and draws no
+dependencies. Moves are still reported as `change`.
+
 ## Styling
 
 The components' classes carry the prefix `tk:` (`tk:flex`), compiled into `style.css` against Nuxt UI's design tokens
