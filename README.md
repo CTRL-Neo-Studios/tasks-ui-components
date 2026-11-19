@@ -116,17 +116,23 @@ scale or a list off reports `changeView` (`scale`, `listIds`). The day and week 
 
 `TaskTimeline` takes the same props. On the left, the outline: subtasks under their parent (folding), each task's
 circle (complete or reopen it), its duration in words and its progress (`values.progress`; 100 once done) as a bar in
-its colour. On the right, an axis that zooms from years to minutes: spans as solid bars in the task's colour (`color`,
-else its list's) with its title and its assignees' initials, moments as diamonds, a todo's due as a flag and a span's
-due as a mark, a parent as a thin line over its subtasks' stretch (its progress theirs, by length), and today's line.
+its colour, or its status' name. On the right, an axis that zooms from years to minutes. Whatever dates a task has
+make one solid bar in its colour (`color`, else its list's) with its title and its assignees' initials: start to end
+(or duration); Do to Due; a Do alone, its day (an hour, for a time); a Due alone, its day (the hour before, for a
+time). A date covers its whole day. A due apart from the bar's end (a task with an end and a due) is a flag, red once
+it's past. A parent without dates is a thin line over its subtasks' stretch (its progress theirs, by length); today
+is a line in the primary colour.
 The header's rows follow the zoom: hours under days, days (weekday and date, today as a pill) or weeks under months,
 months under years; weekends are shaded. It's one scroller: the outline stays at the left and the dates at the top,
 and only the rows and header cells on screen are drawn, so thousands of tasks scroll and zoom as a few do.
 
 Pinch, or ⌘/Ctrl + scroll, zooms around the pointer; Hours, Days, Weeks and Months jump to a zoom. A zoom reports
 `changeView` (`zoom`, and the `scale` nearest it) once it rests. A click selects a bar (⌘D duplicates it, ⌫ deletes
-it), a double click opens its editor; a drag moves a bar by days, or by quarter hours for a timed task zoomed to hours,
-or stretches its end (`shiftTask`; a repeating task's series moves whole); a drag from the dot after a bar onto another
+it), a double click opens its editor. A drag moves a bar by days, or by quarter hours for a timed task zoomed to hours
+(`shiftTask`; a repeating task's series moves whole); its right end writes the bar's end (`shiftTask` with `edge:
+'end'`: its end, duration or Due, or a new end for a Do alone), its left end its Do (`stretchStart`; a Due alone gets
+one), never past the other. A group's line dragged moves every subtask with dates; a drag across the row of a task
+without dates gives it a start and an end. A drag from the dot after a bar onto another
 row reports `change` with that row's `dependsOn` grown. Check what comes back before you keep it (the format's
 `validate`): a dependency that closes a loop is an error there. Dependency lines are faint, a hovered or selected
 task's strong. A right click opens a task's menu: its colour, Edit, Reschedule (tomorrow, next week, in two weeks, a

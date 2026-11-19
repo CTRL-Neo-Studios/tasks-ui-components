@@ -69,6 +69,14 @@ export const defaultLabels = {
     copyLink: 'Copy link',
     noColor: 'No colour',
     addPerson: 'Add a person',
+    doTip: 'Do: when you plan to work on it',
+    dueTip: 'Due: when it has to be finished',
+    goToToday: 'Go to today',
+    zoomTip: 'Pinch or ⌘-scroll to zoom',
+    fold: 'Fold',
+    unfold: 'Unfold',
+    linkTip: 'Drag to a task that waits for this one',
+    dragToSchedule: 'Drag across to schedule',
     /** The built-in fields' titles, by id. */
     fields: {status: 'Status', priority: 'Priority', tags: 'Tags', progress: 'Progress', location: 'Location', assignees: 'Assignees'} as Record<string, string>,
     /** The built-in options' titles, by `<field>.<option>`; a document's own title for one wins. */

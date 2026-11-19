@@ -189,13 +189,19 @@ export interface Shift {
 
 const DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/
 
+/** A duration's length in minutes. */
+function minutesIn(duration: string): number {
+    const [, w = '0', d = '0', h = '0', m = '0', s = '0'] = DURATION.exec(duration) ?? []
+    return (Number(w) * 7 + Number(d)) * DAY_MINUTES + Number(h) * 60 + Number(m) + Math.round(Number(s) / 60)
+}
+
 /** A duration stretched by `days` and `minutes`: whole days for an all-day task, hours and minutes for a timed one. */
 function stretch(duration: string, days: number, minutes: number, timed: boolean): string {
-    const [, w = '0', d = '0', h = '0', m = '0', s = '0'] = DURATION.exec(duration) ?? []
-    if (!timed) return `P${Math.max(1, Number(w) * 7 + Number(d) + days)}D`
-    const total = Math.max(SNAP_MINUTES, (Number(w) * 7 + Number(d)) * DAY_MINUTES + Number(h) * 60 + Number(m) + Math.round(Number(s) / 60) + days * DAY_MINUTES + minutes)
-    const hours = Math.floor(total / 60)
-    return `PT${hours ? `${hours}H` : ''}${total % 60 ? `${total % 60}M` : ''}`
+    const total = minutesIn(duration)
+    if (!timed) return `P${Math.max(1, Math.round(total / DAY_MINUTES) + days)}D`
+    const next = Math.max(SNAP_MINUTES, total + days * DAY_MINUTES + minutes)
+    const hours = Math.floor(next / 60)
+    return `PT${hours ? `${hours}H` : ''}${next % 60 ? `${next % 60}M` : ''}`
 }
 
 /** A local time moved: a date by days, a date-time by days and minutes; the form kept. */
@@ -203,9 +209,34 @@ function moved(value: string, days: number, minutes: number): string {
     return value.includes('T') ? fromDateValue(parseDateTime(value).add({days, minutes})) : parseDate(value).add({days}).toString()
 }
 
+// Written alike (`fromDateValue`), two times of one form order as their text does.
+const written = (value: string) => fromDateValue(toDateValue(value))
+const asTime = (value: string) => (value.includes('T') ? value : `${value}T00:00`)
+
+/** An end kept at or after `start`, in its own form: a date on its day or later, a time a quarter hour after it. */
+function notBefore(end: string, start: string): string {
+    const min = end.includes('T') ? moved(asTime(start), 0, SNAP_MINUTES) : start.slice(0, 10)
+    return written(end) < written(min) ? min : end
+}
+
+/** A start kept at or before `end`, in its own form: a date on its day or earlier, a time a quarter hour before it. */
+function notAfter(start: string, end: string): string {
+    const max = start.includes('T') ? moved(asTime(end), end.includes('T') ? 0 : 1, -SNAP_MINUTES) : end.slice(0, 10)
+    return written(start) > written(max) ? max : start
+}
+
+/** A series' exclusions moved as its anchor moved from `from` to `to`, so they still skip the occurrences they did. */
+function excluded(task: Task, from: string, to: string): TaskPatch {
+    if (!task.excludedDates) return {}
+    const instant = (v: string) => Date.parse(v.includes('T') ? `${v}Z` : v)
+    const by = Math.round((instant(to) - instant(from)) / 60_000)
+    return {excludedDates: task.excludedDates.map(v => (v.includes('T') ? moved(v, 0, by) : moved(v, Math.round(by / DAY_MINUTES), 0)))}
+}
+
 /**
  * A drag's edit: `start` moves the whole task (its start, end, due, and the exclusions of its series, so they still
- * fall on the occurrences they skip); `end` stretches its end or its duration, never before its start. Each time keeps
+ * fall on the occurrences they skip); `end` drags its right end, never before its start: its end or its duration, else
+ * its due, else (a start alone) gives it an end, its start's day or an hour after its time, stretched. Each time keeps
  * its form: a date moves by days alone.
  */
 export function shiftTask(task: Task, {days, minutes, edge}: Shift): TaskPatch {
@@ -217,13 +248,40 @@ export function shiftTask(task: Task, {days, minutes, edge}: Shift): TaskPatch {
             ...(task.excludedDates && {excludedDates: task.excludedDates.map(v => moved(v, days, minutes))}),
         }
     }
-    if (task.start === undefined) return {}
-    if (task.duration !== undefined) return {duration: stretch(task.duration, days, minutes, task.start.includes('T'))}
-    if (task.end === undefined) return {}
-    const end = moved(task.end, days, minutes)
-    // Both are the same form; written alike (`fromDateValue`), their text orders as their times do.
-    const before = end < fromDateValue(toDateValue(task.start))
-    return {end: !before ? end : task.start.includes('T') ? moved(task.start, 0, SNAP_MINUTES) : task.start}
+    const {start, end, due, duration} = task
+    if (start === undefined) {
+        if (due === undefined) return {}
+        const next = moved(due, days, minutes)
+        return {due: next, ...excluded(task, due, next)}
+    }
+    if (duration !== undefined) return {duration: stretch(duration, days, minutes, start.includes('T'))}
+    if (end !== undefined) return {end: notBefore(moved(end, days, minutes), start)}
+    if (due !== undefined) return {due: notBefore(moved(due, days, minutes), start)}
+    return {end: notBefore(start.includes('T') ? moved(start, days, 60 + minutes) : moved(start, days, 0), start)}
+}
+
+/**
+ * A drag of a task's left end: its start moved, never past its right end, which stays (a duration shortened to keep
+ * it). A start alone gets an end where its bar ended (its day, or an hour after its time); a due alone gets a start
+ * (its day's, or an hour before its time) moved.
+ */
+export function stretchStart(task: Task, days: number, minutes: number): TaskPatch {
+    const {start, end, due, duration} = task
+    if (start === undefined) {
+        if (due === undefined) return {}
+        const next = notAfter(due.includes('T') ? moved(due, days, minutes - 60) : moved(due, days, 0), due)
+        return {start: next, ...excluded(task, due, next)}
+    }
+    const timed = start.includes('T')
+    if (duration !== undefined) {
+        const total = minutesIn(duration)
+        const by = timed ? Math.min(days * DAY_MINUTES + minutes, total - SNAP_MINUTES) : Math.min(days, Math.round(total / DAY_MINUTES) - 1) * DAY_MINUTES
+        const next = timed ? moved(start, 0, by) : moved(start, by / DAY_MINUTES, 0)
+        return {start: next, duration: timed ? stretch(duration, 0, -by, true) : stretch(duration, -by / DAY_MINUTES, 0, false), ...excluded(task, start, next)}
+    }
+    const ownEnd = timed ? moved(start, 0, 60) : start
+    const next = notAfter(moved(start, days, minutes), end ?? due ?? ownEnd)
+    return {start: next, ...(end === undefined && due === undefined && {end: ownEnd}), ...excluded(task, start, next)}
 }
 
 /**

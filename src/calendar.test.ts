@@ -1,7 +1,7 @@
 import {parseDate} from '@internationalized/date'
 import {resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {describe, expect, test} from 'vitest'
-import {calendarItems, detachOccurrence, draftTask, layoutDay, layoutLanes, monthWeeks, shiftTask} from './calendar'
+import {calendarItems, detachOccurrence, draftTask, layoutDay, layoutLanes, monthWeeks, shiftTask, stretchStart} from './calendar'
 import {applyPatch} from './changes'
 
 const at = '2026-11-18T10:00:00Z'
@@ -76,6 +76,38 @@ describe('drags', () => {
         expect(shiftTask(task('d', {start: '2026-11-20', duration: 'P1D'}), {days: 2, minutes: 0, edge: 'end'})).toEqual({duration: 'P3D'})
         // Never before the start.
         expect(shiftTask(task('e', {start: '2026-11-20T09:00', end: '2026-11-20T10:00'}), {days: 0, minutes: -120, edge: 'end'})).toEqual({end: '2026-11-20T09:15'})
+    })
+
+    test("a right end dragged writes the bar's end: its due, or (a start alone) a new end; never before the start", () => {
+        const end = (extra: Partial<Task>, days: number, minutes = 0) => shiftTask(task('t', extra), {days, minutes, edge: 'end'})
+        expect(end({start: '2026-11-19', due: '2026-11-20'}, 2)).toEqual({due: '2026-11-22'})
+        expect(end({start: '2026-11-19', due: '2026-11-20'}, -5)).toEqual({due: '2026-11-19'})
+        expect(end({due: '2026-11-20T18:00'}, 0, 30)).toEqual({due: '2026-11-20T18:30'})
+        expect(end({start: '2026-11-19'}, 2)).toEqual({end: '2026-11-21'})
+        expect(end({start: '2026-11-19T15:00'}, 0, 30)).toEqual({end: '2026-11-19T16:30'})
+        expect(end({start: '2026-11-19T15:00'}, 0, -120)).toEqual({end: '2026-11-19T15:15'})
+        // A due beside an end stays: the end is the bar's.
+        expect(end({start: '2026-11-19', end: '2026-11-20', due: '2026-11-25'}, 1)).toEqual({end: '2026-11-21'})
+    })
+
+    test('a left end dragged writes the start, never past the right end, which stays', () => {
+        const left = (extra: Partial<Task>, days: number, minutes = 0) => stretchStart(task('t', extra), days, minutes)
+        expect(left({start: '2026-11-19', due: '2026-11-20'}, -2)).toEqual({start: '2026-11-17'})
+        expect(left({start: '2026-11-19', due: '2026-11-20'}, 5)).toEqual({start: '2026-11-20'})
+        expect(left({start: '2026-11-19', end: '2026-11-22'}, 1)).toEqual({start: '2026-11-20'})
+        // A start alone keeps its day (its hour) as an end; a due alone gets a start.
+        expect(left({start: '2026-11-19'}, -2)).toEqual({start: '2026-11-17', end: '2026-11-19'})
+        expect(left({start: '2026-11-19T15:00'}, 0, -30)).toEqual({start: '2026-11-19T14:30', end: '2026-11-19T16:00'})
+        expect(left({due: '2026-11-20'}, -3)).toEqual({start: '2026-11-17'})
+        expect(left({due: '2026-11-20T18:00'}, 0, -30)).toEqual({start: '2026-11-20T16:30'})
+        expect(left({due: '2026-11-20T18:00'}, 0, 90)).toEqual({start: '2026-11-20T17:45'})
+        // A duration shrinks so the end stays, down to a day (a quarter hour).
+        expect(left({start: '2026-11-19', duration: 'P3D'}, 1)).toEqual({start: '2026-11-20', duration: 'P2D'})
+        expect(left({start: '2026-11-19', duration: 'P3D'}, 9)).toEqual({start: '2026-11-21', duration: 'P1D'})
+        expect(left({start: '2026-11-19T09:00', duration: 'PT1H'}, 0, 30)).toEqual({start: '2026-11-19T09:30', duration: 'PT30M'})
+        // A series' exclusions move with its start.
+        expect(left({start: '2026-11-16T10:00', end: '2026-11-16T11:00', recurrence: {freq: 'weekly'}, excludedDates: ['2026-11-23T10:00']}, 0, -60))
+            .toEqual({start: '2026-11-16T09:00', excludedDates: ['2026-11-23T09:00']})
     })
 
     test('one occurrence moved: the series skips it, a task of its own holds it', () => {

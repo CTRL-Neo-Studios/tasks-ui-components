@@ -12,6 +12,7 @@ import UInputTags from '@nuxt/ui/components/InputTags.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
 import USelect from '@nuxt/ui/components/Select.vue'
 import UTextarea from '@nuxt/ui/components/Textarea.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import {type Fields, type FieldOption, type FieldValue, type Frequency, isOverdue, type List, priorityOf, type Task, type TaskDocument} from '@type32/tasks'
 import {computed, onMounted, useTemplateRef} from 'vue'
 import {type TaskPatch, withDue, withRepeat, withStart, withValue} from '../changes'
@@ -164,6 +165,7 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
       <DatePicker
         :model-value="task.start"
         :label="labels.do"
+        :tip="labels.doTip"
         icon="i-lucide-calendar"
         :today="today"
         :locale="locale"
@@ -173,6 +175,7 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
       <DatePicker
         :model-value="task.due"
         :label="labels.due"
+        :tip="labels.dueTip"
         icon="i-lucide-calendar-clock"
         allow-time
         :late="late"
@@ -181,28 +184,36 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
         :week-starts-on="weekStartsOn"
         @update:model-value="change(withDue(task, $event))"
       />
-      <USelect
-        :model-value="repeat"
-        :items="repeatItems"
-        :disabled="!canRepeat"
-        :title="canRepeat ? labels.repeat : labels.repeatNeedsDate"
-        icon="i-lucide-repeat"
-        size="sm"
-        variant="ghost"
-        @update:model-value="(v: string) => v !== 'custom' && change(withRepeat(v === NONE ? undefined : v as Frequency))"
-      />
-      <USelect
-        :model-value="task.listId ?? NONE"
-        :items="listItems"
-        icon="i-lucide-list"
-        size="sm"
-        variant="ghost"
-        @update:model-value="(v: string) => change({listId: v === NONE ? undefined : v})"
-      />
+      <!-- A disabled control takes no pointer: the tooltip is on what's around it, to say why. -->
+      <UTooltip :text="canRepeat ? labels.repeat : labels.repeatNeedsDate">
+        <span class="tk:inline-flex">
+          <USelect
+            :model-value="repeat"
+            :items="repeatItems"
+            :disabled="!canRepeat"
+            icon="i-lucide-repeat"
+            size="sm"
+            variant="ghost"
+            @update:model-value="(v: string) => v !== 'custom' && change(withRepeat(v === NONE ? undefined : v as Frequency))"
+          />
+        </span>
+      </UTooltip>
+      <UTooltip :text="labels.list">
+        <USelect
+          :model-value="task.listId ?? NONE"
+          :items="listItems"
+          icon="i-lucide-list"
+          size="sm"
+          variant="ghost"
+          @update:model-value="(v: string) => change({listId: v === NONE ? undefined : v})"
+        />
+      </UTooltip>
       <UPopover>
-        <UButton icon="i-lucide-tag" size="sm" variant="ghost" color="neutral" :title="fieldTitle(fields.tags!, labels)">
-          <span v-if="tags.length">{{ tags.length }}</span>
-        </UButton>
+        <UTooltip :text="fieldTitle(fields.tags!, labels)">
+          <UButton icon="i-lucide-tag" size="sm" variant="ghost" color="neutral" :aria-label="fieldTitle(fields.tags!, labels)">
+            <span v-if="tags.length">{{ tags.length }}</span>
+          </UButton>
+        </UTooltip>
         <template #content>
           <UInputTags
             :model-value="tags"
@@ -213,9 +224,11 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
         </template>
       </UPopover>
       <UPopover>
-        <UButton size="sm" variant="ghost" color="neutral" :icon="people.length ? undefined : 'i-lucide-users'" :title="fieldTitle(fields.assignees!, labels)" data-assignees>
-          <PeopleStack v-if="people.length" :people="people" :size="18" />
-        </UButton>
+        <UTooltip :text="fieldTitle(fields.assignees!, labels)">
+          <UButton size="sm" variant="ghost" color="neutral" :icon="people.length ? undefined : 'i-lucide-users'" :aria-label="fieldTitle(fields.assignees!, labels)" data-assignees>
+            <PeopleStack v-if="people.length" :people="people" :size="18" />
+          </UButton>
+        </UTooltip>
         <template #content>
           <UInputMenu
             :model-value="people.map(p => p.id)"
@@ -231,9 +244,11 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
         </template>
       </UPopover>
       <UPopover>
-        <UButton size="sm" variant="ghost" color="neutral" :title="labels.color" data-color>
-          <span class="tk:size-3.5 tk:rounded-full tk:ring-1 tk:ring-default" :style="{backgroundColor: color ?? 'var(--ui-primary)'}" />
-        </UButton>
+        <UTooltip :text="labels.color">
+          <UButton size="sm" variant="ghost" color="neutral" :aria-label="labels.color" data-color>
+            <span class="tk:size-3.5 tk:rounded-full tk:ring-1 tk:ring-default" :style="{backgroundColor: color ?? 'var(--ui-primary)'}" />
+          </UButton>
+        </UTooltip>
         <template #content>
           <div class="tk:flex tk:items-center tk:gap-1.5 tk:p-2">
             <button
@@ -246,24 +261,32 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
               :title="c"
               @click="change({color: c})"
             />
-            <UButton icon="i-lucide-circle-slash" size="xs" variant="ghost" color="neutral" :title="labels.noColor" :disabled="!task.color" @click="change({color: undefined})" />
+            <UTooltip :text="labels.noColor">
+              <UButton icon="i-lucide-circle-slash" size="xs" variant="ghost" color="neutral" :aria-label="labels.noColor" :disabled="!task.color" @click="change({color: undefined})" />
+            </UTooltip>
           </div>
         </template>
       </UPopover>
       <UDropdownMenu :items="priorityItems">
-        <UButton icon="i-lucide-flame" size="sm" variant="ghost" color="neutral" :class="flame" :title="fieldTitle(priority, labels)" />
+        <UTooltip :text="fieldTitle(priority, labels)">
+          <UButton icon="i-lucide-flame" size="sm" variant="ghost" color="neutral" :class="flame" :aria-label="fieldTitle(priority, labels)" />
+        </UTooltip>
       </UDropdownMenu>
-      <UButton
-        icon="i-lucide-star"
-        size="sm"
-        variant="ghost"
-        color="neutral"
-        :class="task.starred ? 'tk:text-warning' : 'tk:text-muted'"
-        :title="task.starred ? labels.unstar : labels.star"
-        @click="change({starred: task.starred ? undefined : true})"
-      />
+      <UTooltip :text="task.starred ? labels.unstar : labels.star">
+        <UButton
+          icon="i-lucide-star"
+          size="sm"
+          variant="ghost"
+          color="neutral"
+          :class="task.starred ? 'tk:text-warning' : 'tk:text-muted'"
+          :aria-label="task.starred ? labels.unstar : labels.star"
+          @click="change({starred: task.starred ? undefined : true})"
+        />
+      </UTooltip>
       <UDropdownMenu :items="moreItems">
-        <UButton icon="i-lucide-ellipsis" size="sm" variant="ghost" color="neutral" :title="labels.more" />
+        <UTooltip :text="labels.more">
+          <UButton icon="i-lucide-ellipsis" size="sm" variant="ghost" color="neutral" :aria-label="labels.more" />
+        </UTooltip>
       </UDropdownMenu>
     </div>
   </div>

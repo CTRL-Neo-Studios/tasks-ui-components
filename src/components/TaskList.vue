@@ -8,6 +8,7 @@ import {getLocalTimeZone, today as todayIn} from '@internationalized/date'
 import UButton from '@nuxt/ui/components/Button.vue'
 import UDropdownMenu from '@nuxt/ui/components/DropdownMenu.vue'
 import UIcon from '@nuxt/ui/components/Icon.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
 import {type FieldOption, isOpen, type List, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, ref, useTemplateRef} from 'vue'
@@ -191,7 +192,9 @@ const listMenu = (list: List) => [
           <span class="tk:min-w-0 tk:flex-1 tk:truncate">{{ list.title }}</span>
           <span class="tk:text-xs tk:text-muted tk:group-hover:hidden">{{ countOf(list.id) || '' }}</span>
           <UDropdownMenu :items="listMenu(list)">
-            <UButton icon="i-lucide-ellipsis" size="xs" variant="ghost" color="neutral" class="tk:hidden tk:group-hover:flex" :title="labels.more" @click.stop />
+            <UTooltip :text="labels.more">
+              <UButton icon="i-lucide-ellipsis" size="xs" variant="ghost" color="neutral" class="tk:hidden tk:group-hover:flex" :aria-label="labels.more" @click.stop />
+            </UTooltip>
           </UDropdownMenu>
         </div>
       </template>

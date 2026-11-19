@@ -1,31 +1,34 @@
 <script setup lang="ts">
 /**
- * A timeline of a document: the outline on the left (each task's circle, title, duration and progress; subtasks under
- * their parent, folding), and on the right each task's times on an axis that zooms from months to hours: a span as a
- * solid bar in the task's colour with its title and people, a moment as a diamond, a due as a mark, a parent as a thin
- * line over its subtasks. Pinch or ⌘/Ctrl + scroll zooms around the pointer; the presets jump. One scroller: the
- * outline stays at the left, the header at the top, and only the rows and header cells on screen are drawn.
+ * A timeline of a document: the outline on the left (each task's circle, title, duration and progress or status;
+ * subtasks under their parent, folding), and on the right each task's times on an axis that zooms from months to
+ * hours: whatever dates a task has as one solid bar in its colour with its title and people (`TimelineBar`), a due
+ * apart from its bar as a flag, a parent without dates as a thin line over its subtasks. Pinch or ⌘/Ctrl + scroll
+ * zooms around the pointer; the presets jump. One scroller: the outline stays at the left, the header at the top, and
+ * only the rows and header cells on screen are drawn.
  *
- * A click selects a bar (⌘D duplicates it, ⌫ deletes it), a double click opens its editor; a drag moves it, or
- * stretches its end, by a day or, zoomed to hours, by a quarter hour; a drag from the dot after a bar to another row
- * says that row's task waits for it (`dependsOn`); a right click opens its menu. Dependency lines are faint except a
- * hovered or selected task's. Reports what the user does; writes nothing.
+ * A click selects a bar (⌘D duplicates it, ⌫ deletes it), a double click opens its editor; a drag moves it, either end
+ * stretches it (the left its Do, the right its end or Due), by a day or, zoomed to hours, by a quarter hour; a group's
+ * line dragged moves its subtasks; a drag across the row of a task without dates gives it some; a drag from the dot
+ * after a bar to another row says that row's task waits for it (`dependsOn`); a right click opens its menu.
+ * Dependency lines are faint except a hovered or selected task's. Reports what the user does; writes nothing.
  */
 import {type CalendarDate, DateFormatter, getLocalTimeZone, isSameDay, isWeekend, now as nowIn, today as todayIn} from '@internationalized/date'
 import UButton from '@nuxt/ui/components/Button.vue'
 import UCalendar from '@nuxt/ui/components/Calendar.vue'
 import UContextMenu, {type ContextMenuItem} from '@nuxt/ui/components/ContextMenu.vue'
 import UIcon from '@nuxt/ui/components/Icon.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
 import UToggleGroup from '@nuxt/ui/components/ToggleGroup.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
-import {type FieldOption, isOpen, resolveFields, type Task, type TaskDocument, type View, viewTasks} from '@type32/tasks'
+import {type FieldOption, isOpen, resolveFields, statusOf, type Task, type TaskDocument, type View, viewTasks} from '@type32/tasks'
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch} from 'vue'
-import {DAY_MINUTES, shiftTask} from '../calendar'
+import {DAY_MINUTES, draftTask, shiftTask, stretchStart} from '../calendar'
 import type {Patch, TaskPatch} from '../changes'
-import {dayOf} from '../dates'
+import {dayOf, formatTime} from '../dates'
 import {followPointer} from '../drag'
-import {PALETTE} from '../fieldText'
+import {optionTitle, PALETTE} from '../fieldText'
 import {type TaskLabels, useLabels} from '../labels'
 import {assigneesOf, taskColor, textOn} from '../people'
 import {clampZoom, linkPath, presetOf, scaleOf, tickUnit, timelineAxis, type TimelineBar, type TimelineRow, timelineRows, timelineTicks, viewZoom, ZOOM_PRESETS, type ZoomPreset} from '../timeline'
@@ -63,7 +66,7 @@ const labels = useLabels(() => props.labels)
 /** A row's height, the header's, the outline's width; in pixels. */
 const ROW = 44
 const HEADER = 56
-const OUTLINE = 440
+const OUTLINE = 480
 
 const zone = computed(() => props.timeZone ?? getLocalTimeZone())
 const today = computed(() => todayIn(zone.value))
@@ -273,17 +276,28 @@ const shownLinks = computed(() => {
     return links.value.filter(l => l.hi >= first && l.lo <= last).map(l => ({...l, strong: l.ends.some(id => focus.includes(id))}))
 })
 
-// Moved and stretched bars (by days, fractions for minutes); a line drawn from a bar's dot.
-const preview = shallowRef<{ key: string, days: number, edge: 'start' | 'end' }>()
+// Moved and stretched bars (by days, fractions for minutes): one bar's, or (a group's line) every bar of `ids`; a
+// task being drawn on its empty row; a line drawn from a bar's dot.
+type Edge = 'move' | 'start' | 'end'
+const preview = shallowRef<{ key?: string, ids?: ReadonlySet<string>, days: number, edge: Edge }>()
+const drafting = shallowRef<{ id: string, from: number, to: number }>()
 const drawing = shallowRef<{ x1: number, y1: number, x2: number, y2: number }>()
 function placed(bar: TimelineBar) {
-    const p = preview.value?.key === bar.item.key ? preview.value : undefined
-    return {from: bar.from + (p?.edge === 'start' ? p.days : 0), to: bar.to + (p ? p.days : 0)}
+    const p = preview.value
+    if (!p || (p.key !== bar.item.key && !p.ids?.has(bar.item.task.id))) return bar
+    const min = 1 / (unit.value === 'hour' ? 96 : 1)
+    if (p.edge === 'start') return {from: Math.min(bar.from + p.days, bar.to - min), to: bar.to}
+    if (p.edge === 'end') return {from: bar.from, to: Math.max(bar.to + p.days, bar.from + min)}
+    return {from: bar.from + p.days, to: bar.to + p.days}
+}
+const summaryOf = (row: TimelineRow) => {
+    const p = preview.value?.ids?.has(row.task.id) ? preview.value.days : 0
+    return row.summary && {from: row.summary.from + p, to: row.summary.to + p}
 }
 /** A bar's look: where it is, its colour, and whether its title fits in it (else it's written after it). */
 function barOf(row: TimelineRow, bar: TimelineBar) {
     const {from, to} = placed(bar)
-    const px = Math.max(6, (to - from) * dw.value)
+    const px = Math.max(16, (to - from) * dw.value)
     const people = assigneesOf(row.task, fields.value)
     const title = row.task.title || labels.value.newTask
     const fits = px >= 24 + Math.min(people.length, 3) * 14 + title.length * 7
@@ -293,27 +307,101 @@ function barOf(row: TimelineRow, bar: TimelineBar) {
     const inset = Math.max(0, Math.min(scroll.value.left - left, px - 160))
     return {left, px, inset, people, title, fits, peopleFit: px >= 16 + Math.min(people.length, 3) * 14, fill, text: textOn(fill)}
 }
-const pointX = (bar: TimelineBar) => placed(bar).from * dw.value
+/** What an end of a bar writes, said on it: the left end its Do, the right its Due when it's the bar's end. */
+const endTip = (task: Task, edge: 'start' | 'end') =>
+    edge === 'start' ? labels.value.doTip : task.end === undefined && task.duration === undefined && task.due !== undefined ? labels.value.dueTip : undefined
+/** The time an edge drags: whether it's a date-time decides if it moves by quarter hours when zoomed to hours. */
+const edgeTime = (task: Task, edge: Edge) =>
+    edge === 'end' ? (task.duration !== undefined ? task.start : task.end ?? task.due ?? task.start) : (task.start ?? task.due)
+/** How far the pointer went, in days: whole ones, or quarter hours when `byMinutes`. */
+const deltaOf = (from: number, to: number, byMinutes: boolean) => {
+    const d = (to - from) / dw.value
+    return byMinutes ? Math.round((d * DAY_MINUTES) / 15) * 15 / DAY_MINUTES : Math.round(d)
+}
+const shiftOf = (d: number, byMinutes: boolean) => (byMinutes ? {days: 0, minutes: Math.round(d * DAY_MINUTES)} : {days: d, minutes: 0})
 
-function barDown(event: PointerEvent, row: TimelineRow, bar: TimelineBar, edge: 'start' | 'end') {
+function barDown(event: PointerEvent, row: TimelineRow, bar: TimelineBar, edge: Edge) {
     if (event.button !== 0) return
     event.stopPropagation()
-    // Zoomed to hours, a date-time task moves by quarter hours; anything else by days.
-    const byMinutes = unit.value === 'hour' && (row.task.start ?? row.task.due ?? '').includes('T')
-    const delta = (e: PointerEvent) => {
-        const d = (e.clientX - event.clientX) / dw.value
-        return byMinutes ? Math.round((d * DAY_MINUTES) / 15) * 15 / DAY_MINUTES : Math.round(d)
-    }
+    const task = row.task
+    const byMinutes = unit.value === 'hour' && !!edgeTime(task, edge)?.includes('T')
     const el = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-bar]')!
-    followPointer(event, e => (preview.value = {key: bar.item.key, days: delta(e), edge}), (e, moved) => {
+    followPointer(event, e => (preview.value = {key: bar.item.key, days: deltaOf(event.clientX, e.clientX, byMinutes), edge}), (e, moved) => {
         preview.value = undefined
-        if (!moved) return props.editor ? void (selected.value = row.task.id) : open(row.task.id, el)
-        const d = delta(e)
+        if (!moved) return props.editor ? void (selected.value = task.id) : open(task.id, el)
+        const d = deltaOf(event.clientX, e.clientX, byMinutes)
         if (!d) return
-        const shift = byMinutes ? {days: 0, minutes: Math.round(d * DAY_MINUTES)} : {days: d, minutes: 0}
-        emit('change', row.task.id, shiftTask(row.task, {...shift, edge}))
+        const {days: by, minutes} = shiftOf(d, byMinutes)
+        const patch = edge === 'start' ? stretchStart(task, by, minutes) : shiftTask(task, {days: by, minutes, edge: edge === 'move' ? 'start' : 'end'})
+        if (Object.keys(patch).length) emit('change', task.id, patch)
     })
 }
+
+/** A group's line dragged: every subtask under it with dates moves by as much, each its own change. */
+function summaryDown(event: PointerEvent, row: TimelineRow) {
+    if (event.button !== 0 || !props.editor) return
+    event.stopPropagation()
+    const under: Task[] = []
+    const walk = (id: string) => props.document.tasks.forEach((t) => {
+        if (t.parentId === id && !t.deletedAt) (under.push(t), walk(t.id))
+    })
+    walk(row.task.id)
+    const ids = new Set([row.task.id, ...under.map(t => t.id)])
+    followPointer(event, e => (preview.value = {ids, days: deltaOf(event.clientX, e.clientX, false), edge: 'move'}), (e, moved) => {
+        preview.value = undefined
+        const days = moved ? deltaOf(event.clientX, e.clientX, false) : 0
+        if (!days) return
+        for (const t of under) {
+            const patch = shiftTask(t, {days, minutes: 0, edge: 'start'})
+            if (Object.keys(patch).length) emit('change', t.id, patch)
+        }
+    })
+}
+
+/** On the row of a task without dates: a drag across it gives it a start and an end (times, zoomed to hours). */
+function rowDown(event: PointerEvent, row: TimelineRow) {
+    if (event.button !== 0 || !props.editor || row.bars.length || row.summary) return
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const byMinutes = unit.value === 'hour'
+    const step = byMinutes ? 15 / DAY_MINUTES : 1
+    const at = (x: number, round: (n: number) => number) => round((x - box.left) / dw.value / step) * step
+    const range = (e: PointerEvent) => {
+        const [a, b] = [at(event.clientX, Math.floor), at(e.clientX, Math.floor)]
+        return {from: Math.min(a, b), to: Math.max(a, b) + step}
+    }
+    followPointer(event, e => (drafting.value = {id: row.task.id, ...range(e)}), (e, moved) => {
+        drafting.value = undefined
+        if (!moved) return
+        const {from, to} = range(e)
+        const day = (d: number) => axis.value.from.add({days: Math.floor(d)})
+        const minutes = (d: number) => Math.round((d - Math.floor(d)) * DAY_MINUTES)
+        const draft = byMinutes
+            ? draftTask(day(from), day(to), {start: minutes(from), end: minutes(to)})
+            : draftTask(day(from), day(to - 1))
+        emit('change', row.task.id, {start: draft.start, ...(draft.end !== undefined && {end: draft.end})})
+    })
+}
+
+const statusText = (task: Task) => {
+    const field = fields.value.status!
+    const option = field.options.find(o => o.id === task.values?.status) ?? field.options.find(o => o.category === statusOf(task, fields.value))
+    return option ? optionTitle(props.document, field, option, labels.value) : ''
+}
+const dueText = (task: Task) => (task.due === undefined ? '' : `${labels.value.due} ${formatTime(task.due, locale.value, today.value)}`)
+
+// One tooltip for every row's bits, each with its words in `data-tip`: one instance however many rows are drawn. It
+// shows after the pointer rests a moment on one, and goes when it leaves or presses.
+const tip = shallowRef<{ text: string, el: HTMLElement }>()
+let tipTimer: ReturnType<typeof setTimeout> | undefined
+function tipOver(event: PointerEvent | undefined) {
+    const el = (event?.target as HTMLElement | undefined)?.closest<HTMLElement>('[data-tip]')
+    if (el && el === tip.value?.el) return
+    clearTimeout(tipTimer)
+    tip.value = undefined
+    const text = el?.dataset.tip
+    if (el && text && !event!.buttons) tipTimer = setTimeout(() => (tip.value = {text, el}), 400)
+}
+onBeforeUnmount(() => clearTimeout(tipTimer))
 
 function linkDown(event: PointerEvent, row: TimelineRow, index: number) {
     if (event.button !== 0) return
@@ -443,14 +531,18 @@ function key(e: KeyboardEvent) {
 <template>
   <div class="tk:flex tk:h-full tk:min-h-0 tk:flex-col">
     <div class="tk:flex tk:items-center tk:gap-2 tk:border-b tk:border-default tk:px-3 tk:py-1.5">
-      <UButton size="sm" variant="outline" color="neutral" :label="labels.today" @click="toToday" />
+      <UTooltip :text="labels.goToToday">
+        <UButton size="sm" variant="outline" color="neutral" :label="labels.today" @click="toToday" />
+      </UTooltip>
       <span class="tk:grow" />
-      <UToggleGroup
-        :items="presetItems"
-        size="sm"
-        :model-value="preset"
-        @update:model-value="(v: unknown) => typeof v === 'string' && v in ZOOM_PRESETS && zoomAt(ZOOM_PRESETS[v as ZoomPreset])"
-      />
+      <UTooltip :text="labels.zoomTip">
+        <UToggleGroup
+          :items="presetItems"
+          size="sm"
+          :model-value="preset"
+          @update:model-value="(v: unknown) => typeof v === 'string' && v in ZOOM_PRESETS && zoomAt(ZOOM_PRESETS[v as ZoomPreset])"
+        />
+      </UTooltip>
     </div>
     <UContextMenu :items="menu">
       <div
@@ -460,7 +552,9 @@ function key(e: KeyboardEvent) {
         @scroll="scrolled"
         @keydown="key"
         @contextmenu.capture="pick"
-        @pointerdown="selected = undefined"
+        @pointerdown="selected = undefined; tipOver(undefined)"
+        @pointerover="tipOver"
+        @pointerleave="tipOver(undefined)"
       >
         <div ref="content" class="tk:relative tk:min-h-full" :style="{width: `${OUTLINE + width}px`, height: `${virtualizer.getTotalSize()}px`}">
           <div class="tk:sticky tk:top-0 tk:z-30 tk:flex tk:border-b tk:border-default tk:bg-default" :style="{height: `${HEADER}px`}">
@@ -469,8 +563,8 @@ function key(e: KeyboardEvent) {
               :style="{width: `${OUTLINE}px`}"
             >
               <span class="tk:flex-1">{{ labels.title }}</span>
-              <span class="tk:w-20">{{ labels.duration }}</span>
-              <span class="tk:w-32">{{ labels.fields.status }}</span>
+              <span class="tk:w-16">{{ labels.duration }}</span>
+              <span class="tk:w-20">{{ labels.fields.status }}</span>
             </div>
             <div class="tk:relative tk:shrink-0 tk:text-xs" :style="{width: `${width}px`}">
               <div
@@ -505,7 +599,7 @@ function key(e: KeyboardEvent) {
           <div class="tk:pointer-events-none tk:absolute tk:inset-y-0" :style="{left: `${OUTLINE}px`, width: `${width}px`}">
             <div v-for="d in weekends" :key="`w${d}`" class="tk:absolute tk:inset-y-0 tk:bg-elevated/60" :style="{left: `${d * dw}px`, width: `${dw}px`}" />
             <div v-for="t in header.major" :key="`l${t.day}`" class="tk:absolute tk:inset-y-0 tk:border-s tk:border-default" :style="{left: `${t.at * dw}px`}" />
-            <div class="tk:absolute tk:inset-y-0 tk:w-px tk:bg-error/70" :style="{left: `${nowX}px`}" />
+            <div class="tk:absolute tk:inset-y-0 tk:w-px tk:bg-primary" :style="{left: `${nowX}px`}" data-now />
           </div>
           <svg
             v-if="editor"
@@ -559,6 +653,8 @@ function key(e: KeyboardEvent) {
                       type="button"
                       class="tk:flex tk:size-5 tk:shrink-0 tk:items-center tk:justify-center tk:rounded tk:text-muted tk:hover:text-default"
                       :aria-expanded="!folded.has(row.task.id)"
+                      :aria-label="folded.has(row.task.id) ? labels.unfold : labels.fold"
+                      :data-tip="folded.has(row.task.id) ? labels.unfold : labels.fold"
                       data-fold
                       @click="fold(row.task.id)"
                     >
@@ -568,91 +664,108 @@ function key(e: KeyboardEvent) {
                     <button
                       type="button"
                       data-title
+                      :data-tip="row.task.title || labels.newTask"
                       class="tk:min-w-0 tk:flex-1 tk:truncate tk:text-start"
                       :class="[row.parent && 'tk:font-semibold', isOpen(row.task, fields) ? 'tk:text-highlighted' : 'tk:text-muted tk:line-through']"
                       @click="open(row.task.id, $event.currentTarget as HTMLElement)"
                     >{{ row.task.title || labels.newTask }}</button>
-                    <span class="tk:w-20 tk:shrink-0 tk:text-muted tk:tabular-nums">{{ lengthText(row.length) }}</span>
-                    <span class="tk:flex tk:w-32 tk:shrink-0 tk:items-center tk:gap-2" data-progress>
+                    <span class="tk:w-16 tk:shrink-0 tk:truncate tk:text-muted tk:tabular-nums">{{ lengthText(row.length) }}</span>
+                    <span class="tk:flex tk:w-20 tk:shrink-0 tk:items-center tk:gap-2" data-progress>
                       <template v-if="row.progress !== undefined">
                         <span class="tk:h-1.5 tk:flex-1 tk:overflow-hidden tk:rounded-full tk:bg-accented">
                           <span class="tk:block tk:h-full tk:rounded-full" :style="{width: `${row.progress}%`, backgroundColor: row.parent ? 'var(--ui-primary)' : color(row.task)}" />
                         </span>
                         <span class="tk:w-9 tk:text-end tk:text-xs tk:tabular-nums tk:text-muted">{{ Math.round(row.progress) }}%</span>
                       </template>
+                      <span v-else class="tk:truncate tk:text-xs tk:text-muted" data-status>{{ statusText(row.task) }}</span>
                     </span>
                   </div>
                 </div>
                 <!-- A closed task fades here, not in the outline, whose background hides what scrolls under it. -->
-                <div class="tk:relative tk:shrink-0" :class="!isOpen(row.task, fields) && 'tk:opacity-60'" :style="{width: `${width}px`}">
-                  <template v-if="row.summary">
-                    <div
-                      class="tk:absolute tk:top-1/2 tk:h-1 tk:-translate-y-1/2 tk:rounded-full tk:bg-accented"
-                      :style="{left: `${row.summary.from * dw}px`, width: `${Math.max(4, (row.summary.to - row.summary.from) * dw)}px`}"
-                      data-summary
-                    />
-                    <span
-                      class="tk:pointer-events-none tk:absolute tk:inset-y-0 tk:flex tk:items-center tk:whitespace-nowrap tk:text-sm tk:text-muted"
-                      :style="{left: `${row.summary.to * dw + 10}px`}"
-                    >{{ row.task.title }}</span>
+                <div
+                  class="tk:relative tk:shrink-0"
+                  :class="[!isOpen(row.task, fields) && 'tk:opacity-60', editor && !row.bars.length && !row.summary && 'tk:cursor-crosshair']"
+                  :style="{width: `${width}px`}"
+                  @pointerdown="rowDown($event, row)"
+                >
+                  <template v-for="s in [summaryOf(row)]" :key="0">
+                    <template v-if="s">
+                      <div
+                        class="tk:absolute tk:inset-y-3 tk:flex tk:items-center"
+                        :class="editor && 'tk:cursor-grab'"
+                        :style="{left: `${s.from * dw}px`, width: `${Math.max(4, (s.to - s.from) * dw)}px`}"
+                        data-summary
+                        @pointerdown="summaryDown($event, row)"
+                      >
+                        <span class="tk:h-1 tk:w-full tk:rounded-full tk:bg-accented" />
+                      </div>
+                      <span
+                        class="tk:pointer-events-none tk:absolute tk:inset-y-0 tk:flex tk:items-center tk:whitespace-nowrap tk:text-sm tk:text-muted"
+                        :style="{left: `${s.to * dw + 10}px`}"
+                      >{{ row.task.title }}</span>
+                    </template>
                   </template>
                   <template v-for="bar in row.bars" :key="bar.item.key">
-                    <template v-if="bar.item.kind === 'span'">
-                      <template v-for="b in [barOf(row, bar)]" :key="0">
-                        <div
-                          data-bar
-                          :data-item="bar.item.key"
-                          class="tk:absolute tk:inset-y-1.5 tk:flex tk:cursor-grab tk:items-center tk:gap-1.5 tk:overflow-hidden tk:rounded-lg tk:px-1.5 tk:shadow-xs"
-                          :class="selected === row.task.id && 'tk:ring-2 tk:ring-(--ui-text-highlighted) tk:ring-offset-1 tk:ring-offset-(--ui-bg)'"
-                          :style="{left: `${b.left}px`, width: `${b.px}px`, paddingInlineStart: `${6 + b.inset}px`, backgroundColor: b.fill, color: b.text}"
-                          @pointerdown="barDown($event, row, bar, 'start')"
-                          @dblclick="open(row.task.id, $event.currentTarget as HTMLElement)"
-                        >
-                          <PeopleStack v-if="b.peopleFit" :people="b.people" :size="22" />
-                          <span v-if="b.fits" class="tk:min-w-0 tk:truncate tk:text-sm tk:font-medium">{{ b.title }}</span>
-                          <span class="tk:absolute tk:inset-y-0 tk:end-0 tk:w-2 tk:cursor-ew-resize" data-stretch @pointerdown="barDown($event, row, bar, 'end')" />
-                        </div>
-                        <span
-                          v-if="!b.fits"
-                          class="tk:pointer-events-none tk:absolute tk:inset-y-0 tk:flex tk:items-center tk:whitespace-nowrap tk:text-sm tk:text-default"
-                          :style="{left: `${b.left + b.px + 8}px`}"
-                        >{{ b.title }}</span>
-                      </template>
-                    </template>
-                    <template v-else>
+                    <template v-for="b in [barOf(row, bar)]" :key="0">
                       <div
                         data-bar
                         :data-item="bar.item.key"
-                        class="tk:absolute tk:top-0 tk:flex tk:h-full tk:w-5 tk:-translate-x-1/2 tk:cursor-grab tk:items-center tk:justify-center"
-                        :style="{left: `${pointX(bar)}px`}"
-                        @pointerdown="barDown($event, row, bar, 'start')"
+                        class="tk:absolute tk:inset-y-1.5 tk:flex tk:cursor-grab tk:items-center tk:gap-1.5 tk:overflow-hidden tk:rounded-lg tk:px-1.5 tk:shadow-xs"
+                        :class="selected === row.task.id && 'tk:ring-2 tk:ring-(--ui-text-highlighted) tk:ring-offset-1 tk:ring-offset-(--ui-bg)'"
+                        :style="{left: `${b.left}px`, width: `${b.px}px`, paddingInlineStart: `${6 + b.inset}px`, backgroundColor: b.fill, color: b.text}"
+                        @pointerdown="barDown($event, row, bar, 'move')"
                         @dblclick="open(row.task.id, $event.currentTarget as HTMLElement)"
                       >
-                        <UIcon v-if="bar.item.kind === 'due'" name="i-lucide-flag" class="tk:size-4" :style="{color: color(row.task)}" />
-                        <span
-                          v-else
-                          class="tk:size-3.5 tk:rotate-45 tk:rounded-[3px]"
-                          :class="selected === row.task.id && 'tk:ring-2 tk:ring-(--ui-text-highlighted)'"
-                          :style="{backgroundColor: color(row.task)}"
-                        />
+                        <PeopleStack v-if="b.peopleFit" :people="b.people" :size="22" />
+                        <span v-if="b.fits" class="tk:min-w-0 tk:truncate tk:text-sm tk:font-medium">{{ b.title }}</span>
+                        <template v-if="editor">
+                          <span
+                            v-for="edge in (['start', 'end'] as const)"
+                            :key="edge"
+                            class="tk:absolute tk:inset-y-0 tk:w-2 tk:cursor-ew-resize"
+                            :class="edge === 'start' ? 'tk:start-0' : 'tk:end-0'"
+                            :data-stretch="edge"
+                            :data-tip="endTip(row.task, edge)"
+                            @pointerdown="barDown($event, row, bar, edge)"
+                          />
+                        </template>
                       </div>
                       <span
+                        v-if="!b.fits"
                         class="tk:pointer-events-none tk:absolute tk:inset-y-0 tk:flex tk:items-center tk:whitespace-nowrap tk:text-sm tk:text-default"
-                        :style="{left: `${pointX(bar) + 14}px`}"
-                      >{{ row.task.title }}</span>
+                        :style="{left: `${b.left + b.px + 8}px`}"
+                      >{{ b.title }}</span>
                     </template>
                   </template>
                   <span
                     v-for="(x, i) in row.dues"
                     :key="`due${i}`"
-                    class="tk:pointer-events-none tk:absolute tk:inset-y-1 tk:w-0.5 tk:rounded tk:bg-error"
-                    :style="{left: `${x * dw}px`}"
-                  />
+                    class="tk:absolute tk:top-1/2 tk:z-10 tk:flex tk:size-5 tk:-translate-1/2 tk:items-center tk:justify-center tk:rounded-full tk:bg-default tk:shadow-xs tk:ring tk:ring-default"
+                    :class="x * dw < nowX && isOpen(row.task, fields) && 'tk:text-error'"
+                    :style="{left: `${x * dw}px`, ...(!(x * dw < nowX && isOpen(row.task, fields)) && {color: color(row.task)})}"
+                    :data-tip="dueText(row.task)"
+                    data-due
+                  >
+                    <UIcon name="i-lucide-flag" class="tk:size-3" />
+                  </span>
+                  <template v-if="editor && !row.bars.length && !row.summary">
+                    <div
+                      v-if="drafting?.id === row.task.id"
+                      class="tk:pointer-events-none tk:absolute tk:inset-y-1.5 tk:rounded-lg tk:opacity-50"
+                      :style="{left: `${drafting.from * dw}px`, width: `${(drafting.to - drafting.from) * dw}px`, backgroundColor: color(row.task)}"
+                    />
+                    <span
+                      v-else
+                      class="tk:pointer-events-none tk:absolute tk:inset-y-0 tk:flex tk:items-center tk:text-xs tk:text-muted tk:opacity-0 tk:group-hover:opacity-100"
+                      :style="{left: `${scroll.left + 12}px`}"
+                    >{{ labels.dragToSchedule }}</span>
+                  </template>
                   <template v-for="span in [extent(row)]" :key="0">
                     <span
                       v-if="span && editor && !row.summary"
                       class="tk:absolute tk:top-1/2 tk:size-2.5 tk:-translate-y-1/2 tk:cursor-crosshair tk:rounded-full tk:border-2 tk:border-primary tk:bg-default tk:opacity-0 tk:group-hover:opacity-100"
-                      :style="{left: `${span.to * dw + 4}px`}"
+                      :style="{left: `${Math.max(span.to * dw, span.from * dw + 16) + 6}px`}"
+                      :data-tip="labels.linkTip"
                       data-link-from
                       @pointerdown="linkDown($event, row, item.index)"
                     />
@@ -691,6 +804,7 @@ function key(e: KeyboardEvent) {
         <span class="tk:size-2.5 tk:shrink-0 tk:rounded-full" :style="{backgroundColor: (item as {swatch?: string}).swatch ?? 'var(--ui-primary)'}" />
       </template>
     </UContextMenu>
+    <UTooltip :open="!!tip" :text="tip?.text" :reference="tip?.el" />
     <UPopover
       :open="!!picking"
       :reference="picking?.el"

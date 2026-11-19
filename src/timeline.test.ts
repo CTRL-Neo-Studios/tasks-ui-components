@@ -31,12 +31,25 @@ describe('timelineRows', () => {
         expect(design!.length).toBe(4)
         expect(build!.bars[0]!.to - build!.bars[0]!.from).toBeCloseTo(0.25)
         expect(build!.progress).toBe(100)
-        expect(build!.dues).toEqual([6.5])
+        // A date due is due by the end of its day; it's apart from the bar, which ends at `end`.
+        expect(build!.dues).toEqual([7])
         expect(launch!.summary).toEqual({from: 1, to: 5.625})
         expect(launch!.progress).toBeCloseTo((50 * 4 + 100 * 0.25) / 4.25)
-        // A date moment and a timed due are points: the middle of the day, the time.
-        expect(ship!.bars.map(b => [b.item.kind, b.from, b.to])).toEqual([['moment', 9.5, 9.5]])
-        expect(report!.bars.map(b => [b.item.kind, b.from])).toEqual([['due', 11 + 18 / 24]])
+        // A date alone is its whole day; a time alone a nominal hour (before a due), with no length.
+        expect(ship!.bars.map(b => [b.from, b.to])).toEqual([[9, 10]])
+        expect(ship!.length).toBe(1)
+        expect(report!.bars.map(b => [b.from, b.to, b.nominal])).toEqual([[11 + 17 / 24, 11 + 18 / 24, true]])
+        expect(report!.length).toBeUndefined()
+    })
+
+    test('a Do and a Due make one bar, Do to the end of Due; a time alone an hour from it', () => {
+        const [both, call] = rows([task('both', {start: '2026-11-19', due: '2026-11-20'}), task('call', {start: '2026-11-03T15:00'})])
+        expect(both!.bars.map(b => [b.from, b.to])).toEqual([[18, 20]])
+        expect(both!.length).toBe(2)
+        expect(both!.dues).toEqual([])
+        const [trip] = rows([task('trip', {start: '2026-11-17', end: '2026-11-18', due: '2026-11-18'})])
+        expect(trip!.dues).toEqual([])
+        expect(call!.bars.map(b => [b.from, b.to, b.nominal])).toEqual([[2 + 15 / 24, 2 + 16 / 24, true]])
     })
 
     test("a folded task's subtasks aren't rows; its summary stays", () => {

@@ -10,6 +10,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import UCalendar from '@nuxt/ui/components/Calendar.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
 import UToggleGroup from '@nuxt/ui/components/ToggleGroup.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import {type FieldOption, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, onBeforeUnmount, ref, shallowRef} from 'vue'
 import {type CalendarItem, calendarItems, draftTask, monthWeeks, type Shift, shiftTask, SNAP_MINUTES, weekStart} from '../calendar'
@@ -164,8 +165,12 @@ function gridCreate(event: MouseEvent, day: CalendarDate) {
     </aside>
     <div class="tk:flex tk:min-w-0 tk:flex-1 tk:flex-col">
       <div class="tk:flex tk:items-center tk:gap-2 tk:border-b tk:border-default tk:px-3 tk:py-1.5">
-        <UButton icon="i-lucide-chevron-left" size="sm" variant="ghost" color="neutral" :title="labels.previous" @click="go(-1)" />
-        <UButton icon="i-lucide-chevron-right" size="sm" variant="ghost" color="neutral" :title="labels.next" @click="go(1)" />
+        <UTooltip :text="labels.previous">
+          <UButton icon="i-lucide-chevron-left" size="sm" variant="ghost" color="neutral" :aria-label="labels.previous" @click="go(-1)" />
+        </UTooltip>
+        <UTooltip :text="labels.next">
+          <UButton icon="i-lucide-chevron-right" size="sm" variant="ghost" color="neutral" :aria-label="labels.next" @click="go(1)" />
+        </UTooltip>
         <UButton size="sm" variant="outline" color="neutral" :label="labels.today" @click="go(0)" />
         <span class="tk:ms-1 tk:truncate tk:font-semibold tk:text-highlighted" data-calendar-title>{{ title }}</span>
         <span class="tk:grow" />

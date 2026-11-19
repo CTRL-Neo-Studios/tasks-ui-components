@@ -1,7 +1,7 @@
 export {default as TaskList} from './components/TaskList.vue'
 export {default as TaskBoard} from './components/TaskBoard.vue'
 export {default as TaskCalendar} from './components/TaskCalendar.vue'
-export {type CalendarItem, calendarItems, detachOccurrence, draftTask, inViewer, layoutDay, layoutLanes, monthWeeks, type Shift, shiftTask, weekStart} from './calendar'
+export {type CalendarItem, calendarItems, detachOccurrence, draftTask, inViewer, layoutDay, layoutLanes, monthWeeks, type Shift, shiftTask, stretchStart, weekStart} from './calendar'
 export {default as TaskTimeline} from './components/TaskTimeline.vue'
 export {type Axis, clampZoom, linkPath, presetOf, scaleOf, type Tick, tickUnit, timelineAxis, type TimelineBar, type TimelineRow, timelineRows, timelineTicks, viewZoom, ZOOM, ZOOM_PRESETS, type ZoomPreset} from './timeline'
 export {assigneesOf, initials, type Person, taskColor, textOn} from './people'

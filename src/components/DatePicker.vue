@@ -8,6 +8,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import UCalendar from '@nuxt/ui/components/Calendar.vue'
 import UInputTime from '@nuxt/ui/components/InputTime.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import {computed} from 'vue'
 import {formatTime, fromDateValue, toDateValue} from '../dates'
 import {useLabels} from '../labels'
@@ -24,6 +25,8 @@ const props = defineProps<{
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
     /** Drawn as a problem (an overdue due). */
     late?: boolean
+    /** What the date means, on hover. */
+    tip?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string | undefined] }>()
 const labels = useLabels(() => undefined)
@@ -52,15 +55,17 @@ const toggleTime = () => (time.value
 
 <template>
   <UPopover>
-    <UButton
-      :icon="icon"
-      size="sm"
-      variant="ghost"
-      :color="late ? 'error' : 'neutral'"
-      :class="modelValue === undefined && 'tk:text-muted'"
-    >
-      {{ modelValue === undefined ? label : `${label} ${formatTime(modelValue, locale, today)}` }}
-    </UButton>
+    <UTooltip :text="tip" :disabled="!tip">
+      <UButton
+        :icon="icon"
+        size="sm"
+        variant="ghost"
+        :color="late ? 'error' : 'neutral'"
+        :class="modelValue === undefined && 'tk:text-muted'"
+      >
+        {{ modelValue === undefined ? label : `${label} ${formatTime(modelValue, locale, today)}` }}
+      </UButton>
+    </UTooltip>
     <template #content>
       <div class="tk:flex tk:flex-col tk:gap-2 tk:p-2">
         <UCalendar :model-value="day" :week-starts-on="weekStartsOn" @update:model-value="pick($event as DateValue | undefined)" />

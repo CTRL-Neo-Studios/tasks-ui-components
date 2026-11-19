@@ -1,6 +1,7 @@
 /*
  * The timeline's model: a document's tasks as an outline (subtasks under their parent) and, on a day axis, each task's
- * bars, moments, dues and its subtasks' stretch. Positions are days from the axis' first day, fractions for times.
+ * bars, its dues apart from them and its subtasks' stretch. Positions are days from the axis' first day, fractions for
+ * times.
  */
 import {type CalendarDate, startOfMonth, startOfYear, toCalendarDate} from '@internationalized/date'
 import {type Fields, isComplete, type Task, type TaskDocument, type View, viewTasks} from '@type32/tasks'
@@ -61,11 +62,17 @@ export function timelineAxis(tasks: readonly Task[], timeZone: string, today: Ca
     return {from: startOfMonth(first).subtract({months: 1}), to: startOfMonth(last).add({months: 3}), timeZone}
 }
 
-/** One time of a task: `from` and `to` in days; a moment's and a todo's due are a point (a date's at its middle). */
+/**
+ * One time of a task, `from` and `to` in days; whatever dates it has make a bar. Start to end (or duration); start to
+ * due; a start alone, its day (an hour, for a time); a due alone, its day (the hour before, for a time). A date covers
+ * its whole day.
+ */
 export interface TimelineBar {
     item: CalendarItem
     from: number
     to: number
+    /** Its length is only drawn: a time alone (start or due) has none. */
+    nominal?: true
 }
 
 export interface TimelineRow {
@@ -75,11 +82,11 @@ export interface TimelineRow {
     parent: boolean
     /** Each occurrence in the axis. */
     bars: TimelineBar[]
-    /** The dues of its spans and moments (a todo's is its bar). */
+    /** The dues of bars that end elsewhere (a task with an end and a due), at their day's end for a date. */
     dues: number[]
     /** A parent without times of its own: what its subtasks cover. */
     summary?: { from: number, to: number }
-    /** The first bar's length in days (the summary's for a parent without times); none for points. */
+    /** The first bar's length in days (the summary's for a parent without times); none for a nominal one. */
     length?: number
     /** `values.progress`; 100 for a completed task; a summary's, its subtasks' weighted by their length. */
     progress?: number
@@ -92,17 +99,30 @@ export interface TimelineRow {
 export function timelineRows(doc: TaskDocument, view: View, fields: Fields, axis: Axis, folded: ReadonlySet<string> = new Set()): TimelineRow[] {
     const shown = viewTasks(doc, view, fields)
     const at = (day: CalendarDate, minutes: number) => day.compare(axis.from) + minutes / DAY_MINUTES
-    const point = (value: string, task: Task) => {
+    /** A time's place: a date's start, or its end (`end`), a date-time where it is. */
+    const place = (value: string, task: Task, end = false) => {
         const v = inViewer(value, task.timeZone, axis.timeZone)
-        return 'hour' in v ? at(toCalendarDate(v), v.hour * 60 + v.minute) : at(v, DAY_MINUTES / 2)
+        return 'hour' in v ? at(toCalendarDate(v), v.hour * 60 + v.minute) : at(v, end ? DAY_MINUTES : 0)
+    }
+    const HOUR = 1 / 24
+    const barOf = (item: CalendarItem): TimelineBar => {
+        const {start, due} = item.occurrence
+        const task = item.task
+        if (item.kind === 'span') return {item, from: at(item.startDay, item.startMin), to: at(item.endDay, item.endMin)}
+        if (start !== undefined && due !== undefined) {
+            const from = place(start, task)
+            return {item, from, to: Math.max(from, place(due, task, true))}
+        }
+        const timed = item.anchor.includes('T')
+        if (start !== undefined) {
+            const from = place(start, task)
+            return {item, from, to: timed ? from + HOUR : place(start, task, true), ...(timed && {nominal: true as const})}
+        }
+        const to = place(item.anchor, task, true)
+        return {item, from: timed ? to - HOUR : place(item.anchor, task), to, ...(timed && {nominal: true as const})}
     }
     const bars = new Map<string, TimelineBar[]>()
-    for (const item of calendarItems(doc, view, fields, axis)) {
-        const bar = item.kind === 'span'
-            ? {item, from: at(item.startDay, item.startMin), to: at(item.endDay, item.endMin)}
-            : {item, from: point(item.anchor, item.task), to: point(item.anchor, item.task)}
-        bars.set(item.task.id, [...bars.get(item.task.id) ?? [], bar])
-    }
+    for (const item of calendarItems(doc, view, fields, axis)) bars.set(item.task.id, [...bars.get(item.task.id) ?? [], barOf(item)])
 
     const ids = new Set(shown.map(t => t.id))
     const children = new Map<string, Task[]>()
@@ -123,8 +143,9 @@ export function timelineRows(doc: TaskDocument, view: View, fields: Fields, axis
             depth: 0,
             parent: kids.length > 0,
             bars: own,
-            dues: own.filter(b => b.item.kind !== 'due' && b.item.occurrence.due !== undefined).map(b => point(b.item.occurrence.due!, task)),
-            ...(first && first.to > first.from && {length: first.to - first.from}),
+            // A due where the bar ends is said by the bar; one elsewhere gets its flag.
+            dues: own.flatMap(b => (b.item.kind === 'span' && b.item.occurrence.due !== undefined ? [place(b.item.occurrence.due, task, true)] : []).filter(x => Math.abs(x - b.to) > 1e-6)),
+            ...(first && !first.nominal && first.to > first.from && {length: first.to - first.from}),
         }
         const value = task.values?.progress
         const progress = typeof value === 'number' ? value : isComplete(task, fields) ? 100 : undefined

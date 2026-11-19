@@ -8,6 +8,7 @@ import type {CalendarDate} from '@internationalized/date'
 import UButton from '@nuxt/ui/components/Button.vue'
 import type {DropdownMenuItem} from '@nuxt/ui/components/DropdownMenu.vue'
 import UDropdownMenu from '@nuxt/ui/components/DropdownMenu.vue'
+import UTooltip from '@nuxt/ui/components/Tooltip.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
 import type {FieldOption, Fields, List, Task, TaskDocument} from '@type32/tasks'
 import {computed, ref, useTemplateRef} from 'vue'
@@ -134,7 +135,9 @@ function commitName(event: Event) {
       <span class="tk:shrink-0 tk:text-muted">{{ group.tasks.length }}</span>
       <span class="tk:grow" />
       <UDropdownMenu v-if="menu" :items="menu">
-        <UButton icon="i-lucide-ellipsis" size="xs" variant="ghost" color="neutral" class="tk:invisible tk:group-hover:visible" :title="labels.more" />
+        <UTooltip :text="labels.more">
+          <UButton icon="i-lucide-ellipsis" size="xs" variant="ghost" color="neutral" class="tk:invisible tk:group-hover:visible" :aria-label="labels.more" />
+        </UTooltip>
       </UDropdownMenu>
     </div>
     <div ref="scroller" class="tk:min-h-0 tk:flex-1 tk:overflow-y-auto tk:px-2">

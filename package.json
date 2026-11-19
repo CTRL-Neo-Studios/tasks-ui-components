@@ -1,6 +1,6 @@
 {
   "name": "@type32/tasks-ui-components",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Vue components for @type32/tasks documents, drawn with Nuxt UI: list, board, calendar, timeline. For Vue and Nuxt.",
   "license": "MIT",
   "type": "module",
