@@ -1,7 +1,7 @@
 import {parseDate} from '@internationalized/date'
 import {resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {describe, expect, test} from 'vitest'
-import {linkPath, timelineAxis, timelineRows, timelineTicks} from './timeline'
+import {linkPath, presetOf, scaleOf, timelineAxis, timelineRows, timelineTicks, viewZoom} from './timeline'
 
 const at = '2026-11-18T10:00:00Z'
 const task = (id: string, extra: Partial<Task> = {}): Task => ({id, title: id, updatedAt: at, ...extra})
@@ -53,7 +53,7 @@ test('timelineAxis: a month before the earliest time, to two months after the la
 
 describe('timelineTicks', () => {
     test('weeks under months, the first week cut at the axis', () => {
-        const {major, minor} = timelineTicks(axis, 'week', 1)
+        const {major, minor} = timelineTicks(axis, 16, 1)
         expect(major.map(t => [t.day.toString(), t.at, t.width])).toEqual([['2026-11-01', 0, 30], ['2026-12-01', 30, 31]])
         // Nov 1 2026 is a Sunday: its week began on Monday Oct 26.
         expect(minor.slice(0, 2).map(t => [t.day.toString(), t.at, t.width])).toEqual([['2026-10-26', 0, 1], ['2026-11-02', 1, 7]])
@@ -61,10 +61,28 @@ describe('timelineTicks', () => {
     })
 
     test('months under years', () => {
-        const {major, minor} = timelineTicks(axis, 'month', 1)
+        const {major, minor} = timelineTicks(axis, 4, 1)
         expect(major.map(t => [t.day.toString(), t.at, t.width])).toEqual([['2026-01-01', 0, 61]])
         expect(minor.map(t => t.width)).toEqual([30, 31])
     })
+
+    test('hours under days when close, only those on screen', () => {
+        // 960 px a day: a 40 px hour, so every hour; days 3 to 4.5 of the axis on screen.
+        const {major, minor} = timelineTicks(axis, 960, 1, [3, 4.5])
+        expect(major.map(t => t.day.toString())).toEqual(['2026-11-04', '2026-11-05'])
+        expect(minor).toHaveLength(36)
+        expect([minor[0]!.hour, minor[0]!.at, minor.at(-1)!.hour]).toEqual([0, 3, 11])
+        // 320 px a day: hours by three (40 px each).
+        expect(timelineTicks(axis, 320, 1, [0, 1]).minor.map(t => t.hour)).toEqual([0, 3, 6, 9, 12, 15, 18, 21])
+    })
+})
+
+test('zoom: a view\'s, the scale beside it, the preset it\'s at', () => {
+    expect(viewZoom({...view, zoom: 5000})).toBe(1440)
+    expect(viewZoom({...view, scale: 'month'})).toBe(4)
+    expect(viewZoom(view)).toBe(16)
+    expect([scaleOf(960), scaleOf(16), scaleOf(3)]).toEqual(['day', 'week', 'month'])
+    expect([presetOf(50), presetOf(30), presetOf(900)]).toEqual(['days', undefined, 'hours'])
 })
 
 test("linkPath: straight on when the next starts after, around between the rows when it doesn't", () => {

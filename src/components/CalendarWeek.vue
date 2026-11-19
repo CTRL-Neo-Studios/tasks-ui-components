@@ -11,6 +11,7 @@ import {computed, onMounted, useTemplateRef} from 'vue'
 import {type CalendarItem, layoutDay, layoutLanes, MIN_MINUTES} from '../calendar'
 import {formatClock} from '../dates'
 import {HOUR_PX, type Preview} from '../drag'
+import {taskColor} from '../people'
 
 const props = defineProps<{
     days: CalendarDate[]
@@ -38,7 +39,7 @@ const template = computed(() => ({gridTemplateColumns: `4.5rem repeat(${props.da
 
 const locale = computed(() => props.locale ?? new Intl.DateTimeFormat().resolvedOptions().locale)
 const weekday = computed(() => new DateFormatter(locale.value, {weekday: 'short', timeZone: 'UTC'}))
-const color = (item: CalendarItem) => (item.task.listId !== undefined ? props.lists.get(item.task.listId)?.color : undefined)
+const color = (item: CalendarItem) => taskColor(item.task, props.lists)
 const tint = (item: CalendarItem, amount: number) => `color-mix(in oklab, ${color(item) ?? 'var(--ui-primary)'} ${amount}%, transparent)`
 
 /** A block's place and size, a drag's shift drawn on it while it lasts. */

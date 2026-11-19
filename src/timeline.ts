@@ -7,9 +7,35 @@ import {type Fields, isComplete, type Task, type TaskDocument, type View, viewTa
 import {type CalendarItem, calendarItems, DAY_MINUTES, inViewer, weekStart} from './calendar'
 import {dayOf} from './dates'
 
-/** A day's width at each scale, in pixels. */
-export const DAY_WIDTH = {day: 40, week: 16, month: 4} as const
-export type Scale = keyof typeof DAY_WIDTH
+/** How far the timeline zooms, in pixels a day: from about two years across a screen to about a minute a pixel. */
+export const ZOOM = {min: 2, max: 1440} as const
+/** The presets' pixels a day: the toggle's Hours, Days, Weeks and Months. */
+export const ZOOM_PRESETS = {hours: 960, days: 48, weeks: 16, months: 4} as const
+export type ZoomPreset = keyof typeof ZOOM_PRESETS
+
+export const clampZoom = (zoom: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, zoom))
+
+/** The zoom a view asks for: its `zoom`, else its `scale`'s preset, else Weeks. */
+export function viewZoom(view: View): number {
+    if (typeof view.zoom === 'number' && view.zoom > 0) return clampZoom(view.zoom)
+    const scale: Record<string, number> = {day: ZOOM_PRESETS.days, week: ZOOM_PRESETS.weeks, month: ZOOM_PRESETS.months}
+    return scale[view.scale ?? ''] ?? ZOOM_PRESETS.weeks
+}
+
+/** The format's `scale` nearest a zoom, kept beside `zoom` for apps that only know those. */
+export const scaleOf = (zoom: number): 'day' | 'week' | 'month' => (zoom >= 24 ? 'day' : zoom >= 6 ? 'week' : 'month')
+
+/** The preset a zoom is at, within a quarter either way; none between them. */
+export function presetOf(zoom: number): ZoomPreset | undefined {
+    return (Object.entries(ZOOM_PRESETS) as [ZoomPreset, number][]).find(([, w]) => Math.abs(Math.log(zoom / w)) < Math.log(1.25))?.[0]
+}
+
+/** What the header's lower row counts at a zoom: hours (under days), days or weeks (under months), months (under years). */
+export const tickUnit = (dayWidth: number): 'hour' | 'day' | 'week' | 'month' =>
+    dayWidth >= 240 ? 'hour' : dayWidth >= 20 ? 'day' : dayWidth >= 4.5 ? 'week' : 'month'
+
+/** Hours a header cell may count, the first that's at least 40 px wide being used. */
+const HOUR_STEPS = [1, 2, 3, 6, 12]
 
 /** The days the axis covers, `[from, to)`, in the viewer's zone. */
 export interface Axis {
@@ -128,32 +154,44 @@ export function timelineRows(doc: TaskDocument, view: View, fields: Fields, axis
     return out
 }
 
-/** A cell of the axis' header: its first day, where it starts and how wide it is, in days. */
+/** A cell of the axis' header: its first day (and hour), where it starts and how wide it is, in days. */
 export interface Tick {
     day: CalendarDate
+    hour?: number
     at: number
     width: number
 }
 
 /**
- * The header's two rows: days under months at the day scale, weeks under months at the week scale, months under years
- * at the month scale. Cells are cut at the axis' ends.
+ * The header's two rows at a zoom (`tickUnit`), cells cut at the axis' ends, only those in `range` (days from the
+ * axis' start, what's on screen), so a close zoom over a long axis stays a screenful of cells.
  */
-export function timelineTicks(axis: Axis, scale: Scale, weekStartsOn: number): { major: Tick[], minor: Tick[] } {
+export function timelineTicks(axis: Axis, dayWidth: number, weekStartsOn: number, range?: readonly [number, number]): { major: Tick[], minor: Tick[] } {
     const total = axis.to.compare(axis.from)
+    const [lo, hi] = range ?? [0, total]
+    const shown = (t: Tick) => t.at + t.width > lo && t.at < hi
     const cut = (first: CalendarDate, next: (d: CalendarDate) => CalendarDate): Tick[] => {
         const ticks: Tick[] = []
         for (let day = first; day.compare(axis.to) < 0; day = next(day)) {
             const at = Math.max(0, day.compare(axis.from))
-            ticks.push({day, at, width: Math.min(total, next(day).compare(axis.from)) - at})
+            const tick = {day, at, width: Math.min(total, next(day).compare(axis.from)) - at}
+            if (shown(tick)) ticks.push(tick)
         }
         return ticks
     }
+    const days = (d: CalendarDate) => d.add({days: 1})
     const months = (d: CalendarDate) => d.add({months: 1})
-    if (scale === 'month') return {major: cut(startOfYear(axis.from), d => d.add({years: 1})), minor: cut(startOfMonth(axis.from), months)}
+    const unit = tickUnit(dayWidth)
+    if (unit === 'month') return {major: cut(startOfYear(axis.from), d => d.add({years: 1})), minor: cut(startOfMonth(axis.from), months)}
+    if (unit === 'hour') {
+        const step = HOUR_STEPS.find(s => (s * dayWidth) / 24 >= 40) ?? 12
+        const major = cut(axis.from, days)
+        const minor = major.flatMap(d => Array.from({length: 24 / step}, (_, i) => ({day: d.day, hour: i * step, at: d.at + (i * step) / 24, width: step / 24})))
+        return {major, minor: minor.filter(shown)}
+    }
     return {
         major: cut(startOfMonth(axis.from), months),
-        minor: scale === 'day' ? cut(axis.from, d => d.add({days: 1})) : cut(weekStart(axis.from, weekStartsOn), d => d.add({days: 7})),
+        minor: unit === 'day' ? cut(axis.from, days) : cut(weekStart(axis.from, weekStartsOn), d => d.add({days: 7})),
     }
 }
 

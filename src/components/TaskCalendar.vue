@@ -10,7 +10,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import UCalendar from '@nuxt/ui/components/Calendar.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
 import UToggleGroup from '@nuxt/ui/components/ToggleGroup.vue'
-import {resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
+import {type FieldOption, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, onBeforeUnmount, ref, shallowRef} from 'vue'
 import {type CalendarItem, calendarItems, draftTask, monthWeeks, type Shift, shiftTask, SNAP_MINUTES, weekStart} from '../calendar'
 import type {Patch, TaskPatch} from '../changes'
@@ -35,6 +35,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
     change: [id: string, patch: TaskPatch]
     create: [task: Task]
+    /** A person added in a task's editor (`assignees`). */
+    createOption: [field: string, option: FieldOption]
     /** The view's `scale` or `listIds` changed here. */
     changeView: [patch: Patch<View>]
     /** A task clicked, with `editor` off. */
@@ -224,6 +226,7 @@ function gridCreate(event: MouseEvent, day: CalendarDate) {
             :week-starts-on="weekStartsOn"
             @change="(patch: TaskPatch) => emit('change', editingTask!.id, patch)"
             @create="create"
+            @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
             @close="editing = undefined"
           >
             <template v-if="$slots.notes" #notes="scope">

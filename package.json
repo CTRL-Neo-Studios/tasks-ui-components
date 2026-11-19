@@ -1,6 +1,6 @@
 {
   "name": "@type32/tasks-ui-components",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vue components for @type32/tasks documents, drawn with Nuxt UI: list, board, calendar, timeline. For Vue and Nuxt.",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
     "@internationalized/date": "^3.12.4",
     "@nuxt/kit": "^4.0.0",
     "@nuxt/ui": "^4.13.0",
-    "@type32/tasks": "^0.2.0",
+    "@type32/tasks": "^0.3.0",
     "vue": "^3.5.0"
   },
   "peerDependenciesMeta": {
@@ -43,7 +43,7 @@
     "@nuxt/kit": "^4.6.4",
     "@nuxt/ui": "^4.13.0",
     "@tailwindcss/cli": "^4.3.5",
-    "@type32/tasks": "^0.2.0",
+    "@type32/tasks": "file:../tasks",
     "@vitejs/plugin-vue": "^6.0.11",
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3",

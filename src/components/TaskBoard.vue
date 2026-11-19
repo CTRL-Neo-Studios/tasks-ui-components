@@ -147,6 +147,7 @@ const focus = (el: unknown) => (el as HTMLInputElement | null)?.focus()
       :week-starts-on="weekStartsOn"
       @change="(id, patch) => emit('change', id, patch)"
       @create="emit('create', $event)"
+      @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
       @drop="(id, from, before) => drop(group, id, from, before)"
       @add="add(group, $event)"
       @rename="rename(group, $event)"

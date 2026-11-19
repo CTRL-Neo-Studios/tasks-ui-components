@@ -9,7 +9,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import UDropdownMenu from '@nuxt/ui/components/DropdownMenu.vue'
 import UIcon from '@nuxt/ui/components/Icon.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
-import {isOpen, type List, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
+import {type FieldOption, isOpen, type List, resolveFields, type Task, type TaskDocument, type View} from '@type32/tasks'
 import {computed, nextTick, ref, useTemplateRef} from 'vue'
 import type {Patch, TaskPatch} from '../changes'
 import {PALETTE} from '../fieldText'
@@ -32,6 +32,8 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
     change: [id: string, patch: TaskPatch]
     create: [task: Task]
+    /** A person added in a task's editor (`assignees`). */
+    createOption: [field: string, option: FieldOption]
     changeList: [id: string, patch: Patch<List>]
     createList: [list: List]
 }>()
@@ -251,6 +253,7 @@ const listMenu = (list: List) => [
                 @close="openId = undefined"
                 @change="emit('change', row.task.id, $event)"
                 @create="create"
+                @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
               >
                 <template v-if="$slots.notes" #notes="scope">
                   <slot name="notes" v-bind="scope" />

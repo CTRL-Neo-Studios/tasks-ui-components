@@ -114,20 +114,28 @@ scale or a list off reports `changeView` (`scale`, `listIds`). The day and week 
 
 ## The timeline
 
-`TaskTimeline` takes the same props: a Gantt of the view's tasks. On the left, the outline: subtasks under their
-parent (folding), each task's length and progress (`values.progress`; 100 once done). On the right, a day axis at the
-view's `scale` (`day`, `week` or `month`): spans as bars filled to their progress, moments as diamonds, a todo's due as
-a flag and a span's due as a mark, a parent without times of its own as the stretch its subtasks cover (its progress
-theirs, by length), lines from each task to those in its `dependsOn`, today's line. It's one scroller: the outline
-stays at the left and the dates at the top, and only the rows on screen are drawn, so thousands of tasks scroll as a
-few do.
+`TaskTimeline` takes the same props. On the left, the outline: subtasks under their parent (folding), each task's
+circle (complete or reopen it), its duration in words and its progress (`values.progress`; 100 once done) as a bar in
+its colour. On the right, an axis that zooms from years to minutes: spans as solid bars in the task's colour (`color`,
+else its list's) with its title and its assignees' initials, moments as diamonds, a todo's due as a flag and a span's
+due as a mark, a parent as a thin line over its subtasks' stretch (its progress theirs, by length), and today's line.
+The header's rows follow the zoom: hours under days, days (weekday and date, today as a pill) or weeks under months,
+months under years; weekends are shaded. It's one scroller: the outline stays at the left and the dates at the top,
+and only the rows and header cells on screen are drawn, so thousands of tasks scroll and zoom as a few do.
 
-A click opens a task's editor; a drag moves a bar by days, or stretches its end (`shiftTask`; a repeating task's
-series moves whole); a drag from the dot after a bar onto another row reports `change` with that row's `dependsOn`
-grown. Check what comes back before you keep it (the format's `validate`): a dependency that closes a loop is an
-error there. A right click opens a task's menu: Edit, Duplicate, its list (and so its colour), the dependencies to
-remove, Delete. Switching scale reports `changeView` (`scale`). The outline and the bars are `timelineRows`, exported
-with `timelineAxis`, `timelineTicks` and `linkPath` for code of your own.
+Pinch, or ⌘/Ctrl + scroll, zooms around the pointer; Hours, Days, Weeks and Months jump to a zoom. A zoom reports
+`changeView` (`zoom`, and the `scale` nearest it) once it rests. A click selects a bar (⌘D duplicates it, ⌫ deletes
+it), a double click opens its editor; a drag moves a bar by days, or by quarter hours for a timed task zoomed to hours,
+or stretches its end (`shiftTask`; a repeating task's series moves whole); a drag from the dot after a bar onto another
+row reports `change` with that row's `dependsOn` grown. Check what comes back before you keep it (the format's
+`validate`): a dependency that closes a loop is an error there. Dependency lines are faint, a hovered or selected
+task's strong. A right click opens a task's menu: its colour, Edit, Reschedule (tomorrow, next week, in two weeks, a
+date), Duplicate, Copy link (with a `copyLink` prop), its list, the dependencies to remove, Delete. The outline and
+the bars are `timelineRows`, exported with `timelineAxis`, `timelineTicks`, `viewZoom` and `linkPath` for code of your
+own.
+
+A person added in the editor's Assignees (on any view) is reported as `createOption` (`assignees`, the new option)
+before the task's `change` names them: add it to the document's `fields` first.
 
 Both the calendar and the timeline take `:editor="false"` for rows that aren't a document's tasks (a database's, a
 note's): a click reports `open(id)` instead of opening the editor, and the timeline has no menu and draws no

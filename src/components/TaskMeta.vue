@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** What describes a task, small: repeat, its list, tags, star, priority, Do and Due (red when overdue). */
+/** What describes a task, small: repeat, its colour (its own), its list, tags, star, priority, Do and Due (red when overdue), its people. */
 import type {CalendarDate} from '@internationalized/date'
 import UIcon from '@nuxt/ui/components/Icon.vue'
 import {type Fields, isOverdue, type List, priorityOf, type Task} from '@type32/tasks'
@@ -7,6 +7,8 @@ import {computed} from 'vue'
 import {formatTime} from '../dates'
 import {PRIORITY_CLASS} from '../fieldText'
 import {useLabels} from '../labels'
+import {assigneesOf} from '../people'
+import PeopleStack from './PeopleStack.vue'
 
 const props = defineProps<{
     task: Task
@@ -23,11 +25,13 @@ const tags = computed(() => {
     const v = props.task.values?.tags
     return Array.isArray(v) ? v.slice(0, 3) : []
 })
+const people = computed(() => assigneesOf(props.task, props.fields))
 </script>
 
 <template>
   <span class="tk:flex tk:flex-wrap tk:items-center tk:gap-2 tk:text-sm tk:text-muted">
     <UIcon v-if="task.recurrence" name="i-lucide-repeat" class="tk:size-3.5" />
+    <span v-if="task.color" class="tk:size-2.5 tk:rounded-full" :style="{backgroundColor: task.color}" data-color />
     <span v-if="list" class="tk:flex tk:items-center tk:gap-1.5">
       <span class="tk:size-2 tk:rounded-full tk:bg-accented" :style="list.color && {backgroundColor: list.color}" />
       {{ list.title }}
@@ -41,5 +45,6 @@ const tags = computed(() => {
     <span v-if="task.due" class="tk:rounded-md tk:border tk:px-1.5 tk:text-xs" :class="late ? 'tk:border-error/50 tk:text-error' : 'tk:border-default tk:text-default'">
       {{ formatTime(task.due, locale, today) }}
     </span>
+    <PeopleStack :people="people" :size="18" />
   </span>
 </template>

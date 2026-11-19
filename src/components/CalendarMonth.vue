@@ -11,6 +11,7 @@ import {type CalendarItem, layoutLanes} from '../calendar'
 import {formatClock} from '../dates'
 import type {Preview} from '../drag'
 import {useResizeObserver} from '../observe'
+import {taskColor} from '../people'
 
 const props = defineProps<{
     weeks: CalendarDate[][]
@@ -52,7 +53,7 @@ function previewed(day: CalendarDate) {
     const end = p.item.endDay.add({days: p.days})
     return day.compare(start) >= 0 && day.compare(end) <= 0
 }
-const color = (item: CalendarItem) => (item.task.listId !== undefined ? props.lists.get(item.task.listId)?.color : undefined)
+const color = (item: CalendarItem) => taskColor(item.task, props.lists)
 </script>
 
 <template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** One task in the list: its checkbox, title and what describes it. Open, it's the task's editor in a card. */
 import type {CalendarDate} from '@internationalized/date'
-import {type Fields, isOpen, type List, type Task, type TaskDocument} from '@type32/tasks'
+import {type FieldOption, type Fields, isOpen, type List, type Task, type TaskDocument} from '@type32/tasks'
 import type {TaskPatch} from '../changes'
 import {useLabels} from '../labels'
 import TaskCheck from './TaskCheck.vue'
@@ -20,7 +20,7 @@ defineProps<{
     locale?: string
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }>()
-const emit = defineEmits<{ change: [patch: TaskPatch], create: [task: Task], open: [], close: [] }>()
+const emit = defineEmits<{ change: [patch: TaskPatch], create: [task: Task], createOption: [field: string, option: FieldOption], open: [], close: [] }>()
 defineSlots<{ notes?(props: { task: Task, text: string, update: (text: string) => void }): unknown }>()
 const labels = useLabels(() => undefined)
 </script>
@@ -46,6 +46,7 @@ const labels = useLabels(() => undefined)
       :week-starts-on="weekStartsOn"
       @change="emit('change', $event)"
       @create="emit('create', $event)"
+      @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
       @close="emit('close')"
     >
       <template v-if="$slots.notes" #notes="scope">

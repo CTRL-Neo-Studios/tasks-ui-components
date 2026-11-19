@@ -57,8 +57,20 @@ export const defaultLabels = {
     complete: 'Complete',
     reopen: 'Reopen',
     empty: 'No tasks',
+    hours: 'Hours',
+    days: 'Days',
+    weeks: 'Weeks',
+    months: 'Months',
+    reschedule: 'Reschedule',
+    tomorrow: 'Tomorrow',
+    nextWeek: 'Next week',
+    inTwoWeeks: 'In two weeks',
+    pickDate: 'Pick a date…',
+    copyLink: 'Copy link',
+    noColor: 'No colour',
+    addPerson: 'Add a person',
     /** The built-in fields' titles, by id. */
-    fields: {status: 'Status', priority: 'Priority', tags: 'Tags', progress: 'Progress', location: 'Location'} as Record<string, string>,
+    fields: {status: 'Status', priority: 'Priority', tags: 'Tags', progress: 'Progress', location: 'Location', assignees: 'Assignees'} as Record<string, string>,
     /** The built-in options' titles, by `<field>.<option>`; a document's own title for one wins. */
     options: {
         'status.todo': 'To do',

@@ -7,14 +7,17 @@
 import type {CalendarDate} from '@internationalized/date'
 import UButton from '@nuxt/ui/components/Button.vue'
 import UDropdownMenu from '@nuxt/ui/components/DropdownMenu.vue'
+import UInputMenu from '@nuxt/ui/components/InputMenu.vue'
 import UInputTags from '@nuxt/ui/components/InputTags.vue'
 import UPopover from '@nuxt/ui/components/Popover.vue'
 import USelect from '@nuxt/ui/components/Select.vue'
 import UTextarea from '@nuxt/ui/components/Textarea.vue'
-import {type Fields, type FieldValue, type Frequency, isOverdue, type List, priorityOf, type Task, type TaskDocument} from '@type32/tasks'
+import {type Fields, type FieldOption, type FieldValue, type Frequency, isOverdue, type List, priorityOf, type Task, type TaskDocument} from '@type32/tasks'
 import {computed, onMounted, useTemplateRef} from 'vue'
 import {type TaskPatch, withDue, withRepeat, withStart, withValue} from '../changes'
-import {fieldTitle, optionTitle, PRIORITY_CLASS} from '../fieldText'
+import {fieldTitle, optionTitle, PALETTE, PRIORITY_CLASS} from '../fieldText'
+import {assigneesOf, taskColor} from '../people'
+import PeopleStack from './PeopleStack.vue'
 import {type TaskLabels, useLabels} from '../labels'
 import DatePicker from './DatePicker.vue'
 import FieldInput from './FieldInput.vue'
@@ -34,6 +37,8 @@ const emit = defineEmits<{
     /** A subtask to add (`parentId` set). */
     create: [task: Task]
     close: []
+    /** A person added in Assignees: a new option of the `assignees` field (the task's value then names it). */
+    createOption: [field: string, option: FieldOption]
 }>()
 defineSlots<{ notes?(props: { task: Task, text: string, update: (text: string) => void }): unknown }>()
 const labels = useLabels(() => props.labels)
@@ -100,9 +105,20 @@ const tags = computed(() => {
     const v = props.task.values?.tags
     return Array.isArray(v) ? v : []
 })
+// Its colour (its own, else its list's) and the people it's for; a new name in Assignees adds the person first.
+const color = computed(() => taskColor(props.task, props.document.lists ?? []))
+const people = computed(() => assigneesOf(props.task, props.fields))
+const peopleItems = computed(() => (props.fields.assignees?.options ?? []).filter(o => !o.deleted || people.value.some(p => p.id === o.id))
+    .map(o => ({label: o.title, value: o.id})))
+function addPerson(name: string) {
+    const option: FieldOption = {id: crypto.randomUUID(), title: name.trim(), color: PALETTE[peopleItems.value.length % PALETTE.length]!, updatedAt: now()}
+    if (!option.title) return
+    emit('createOption', 'assignees', option)
+    change(withValue(props.task, 'assignees', [...people.value.map(p => p.id), option.id]))
+}
 // The fields a chip doesn't already edit, in the document's order: the document's own, and a built-in one (progress,
 // location) or a deleted one only while the task has a value for it.
-const otherFields = computed(() => Object.values(props.fields).filter(f => !['status', 'priority', 'tags'].includes(f.id)
+const otherFields = computed(() => Object.values(props.fields).filter(f => !['status', 'priority', 'tags', 'assignees'].includes(f.id)
     && ((!f.builtIn && !f.deleted) || props.task.values?.[f.id] !== undefined)))
 const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props.timeZone}))
 </script>
@@ -194,6 +210,44 @@ const late = computed(() => isOverdue(props.task, props.fields, {timeZone: props
             class="tk:m-2 tk:w-64"
             @update:model-value="change(withValue(task, 'tags', $event as string[]))"
           />
+        </template>
+      </UPopover>
+      <UPopover>
+        <UButton size="sm" variant="ghost" color="neutral" :icon="people.length ? undefined : 'i-lucide-users'" :title="fieldTitle(fields.assignees!, labels)" data-assignees>
+          <PeopleStack v-if="people.length" :people="people" :size="18" />
+        </UButton>
+        <template #content>
+          <UInputMenu
+            :model-value="people.map(p => p.id)"
+            :items="peopleItems"
+            value-key="value"
+            multiple
+            create-item
+            :placeholder="labels.addPerson"
+            class="tk:m-2 tk:w-64"
+            @update:model-value="(ids: string[]) => change(withValue(task, 'assignees', ids.length ? ids : undefined))"
+            @create="addPerson"
+          />
+        </template>
+      </UPopover>
+      <UPopover>
+        <UButton size="sm" variant="ghost" color="neutral" :title="labels.color" data-color>
+          <span class="tk:size-3.5 tk:rounded-full tk:ring-1 tk:ring-default" :style="{backgroundColor: color ?? 'var(--ui-primary)'}" />
+        </UButton>
+        <template #content>
+          <div class="tk:flex tk:items-center tk:gap-1.5 tk:p-2">
+            <button
+              v-for="c in PALETTE"
+              :key="c"
+              type="button"
+              class="tk:size-5 tk:rounded-full tk:ring-offset-2 tk:ring-offset-(--ui-bg)"
+              :class="task.color === c && 'tk:ring-2 tk:ring-(--ui-text-highlighted)'"
+              :style="{backgroundColor: c}"
+              :title="c"
+              @click="change({color: c})"
+            />
+            <UButton icon="i-lucide-circle-slash" size="xs" variant="ghost" color="neutral" :title="labels.noColor" :disabled="!task.color" @click="change({color: undefined})" />
+          </div>
         </template>
       </UPopover>
       <UDropdownMenu :items="priorityItems">

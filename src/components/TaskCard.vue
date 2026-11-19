@@ -2,7 +2,7 @@
 /** A task on the board: its checkbox, title and what describes it; a click opens its editor beside it. */
 import type {CalendarDate} from '@internationalized/date'
 import UPopover from '@nuxt/ui/components/Popover.vue'
-import {type Fields, isOpen, type List, type Task, type TaskDocument} from '@type32/tasks'
+import {type FieldOption, type Fields, isOpen, type List, type Task, type TaskDocument} from '@type32/tasks'
 import {ref} from 'vue'
 import type {TaskPatch} from '../changes'
 import {useLabels} from '../labels'
@@ -20,7 +20,7 @@ defineProps<{
     locale?: string
     weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6
 }>()
-const emit = defineEmits<{ change: [patch: TaskPatch], create: [task: Task] }>()
+const emit = defineEmits<{ change: [patch: TaskPatch], create: [task: Task], createOption: [field: string, option: FieldOption] }>()
 defineSlots<{ notes?(props: { task: Task, text: string, update: (text: string) => void }): unknown }>()
 const labels = useLabels(() => undefined)
 const open = ref(false)
@@ -55,6 +55,7 @@ defineOptions({inheritAttrs: false})
           :week-starts-on="weekStartsOn"
           @change="emit('change', $event)"
           @create="emit('create', $event)"
+          @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
           @close="open = false"
         >
           <template v-if="$slots.notes" #notes="scope">

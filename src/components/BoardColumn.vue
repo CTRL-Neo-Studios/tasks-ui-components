@@ -9,7 +9,7 @@ import UButton from '@nuxt/ui/components/Button.vue'
 import type {DropdownMenuItem} from '@nuxt/ui/components/DropdownMenu.vue'
 import UDropdownMenu from '@nuxt/ui/components/DropdownMenu.vue'
 import {useVirtualizer} from '@tanstack/vue-virtual'
-import type {Fields, List, Task, TaskDocument} from '@type32/tasks'
+import type {FieldOption, Fields, List, Task, TaskDocument} from '@type32/tasks'
 import {computed, ref, useTemplateRef} from 'vue'
 import type {TaskPatch} from '../changes'
 import {useLabels} from '../labels'
@@ -34,6 +34,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     change: [id: string, patch: TaskPatch]
     create: [task: Task]
+    createOption: [field: string, option: FieldOption]
     /** A card dropped here: `from` its column's key, `before` the card it now precedes (none: last). */
     drop: [id: string, from: string, before: string | undefined]
     /** New task typed at the foot. */
@@ -162,6 +163,7 @@ function commitName(event: Event) {
             @dragstart="dragStart($event, group.tasks[item.index]!)"
             @change="emit('change', group.tasks[item.index]!.id, $event)"
             @create="emit('create', $event)"
+            @create-option="(field: string, option: FieldOption) => emit('createOption', field, option)"
           >
             <template v-if="$slots.notes" #notes="scope">
               <slot name="notes" v-bind="scope" />
