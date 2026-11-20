@@ -828,7 +828,7 @@ function key(e: KeyboardEvent) {
       @update:open="(o: boolean) => !o && (editing = undefined)"
     >
       <template #content>
-        <div v-if="editingTask" class="tk:w-md tk:max-w-[90vw] tk:p-3">
+        <div v-if="editingTask" class="tk:max-h-(--reka-popover-content-available-height) tk:w-md tk:max-w-[90vw] tk:overflow-y-auto tk:p-3">
           <TaskEditor
             :key="editingTask.id"
             :task="editingTask"

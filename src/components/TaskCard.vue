@@ -44,7 +44,7 @@ defineOptions({inheritAttrs: false})
       <TaskMeta class="tk:ps-7 tk:text-xs" :task="task" :fields="fields" :list="list" :today="today" :time-zone="timeZone" :locale="locale" />
     </div>
     <template #content>
-      <div class="tk:w-md tk:max-w-[90vw] tk:p-3">
+      <div class="tk:max-h-(--reka-popover-content-available-height) tk:w-md tk:max-w-[90vw] tk:overflow-y-auto tk:p-3">
         <TaskEditor
           :task="task"
           :document="document"
